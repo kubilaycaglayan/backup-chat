@@ -9,6 +9,7 @@ p { margin: .5rem 0 1rem; }
 label { display: block; margin: .75rem 0 .35rem; font-weight: 600; }
 input { width: 100%; padding: .7rem; border: 1px solid #adb5bd; border-radius: 6px; font: inherit; }
 button { padding: .7rem 1rem; border: 0; border-radius: 6px; color: white; background: #1769aa; font: inherit; cursor: pointer; }
+button:disabled { opacity: .6; cursor: not-allowed; }
 form button { margin-top: .75rem; }
 .error { min-height: 1.25rem; color: #b42318; margin: .4rem 0; }
 .notification-prompt { margin: 1rem 0; padding: .9rem; border: 1px solid #b9d9ef; border-radius: 8px; background: #eef8ff; }

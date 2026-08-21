@@ -67,13 +67,18 @@
   }
 
   async function setupNotifications() {
-    if (!("Notification" in window) || !("PushManager" in window) || !("serviceWorker" in navigator)) return;
     try {
       const response = await fetch("/push/config");
       const config = await response.json();
       pushPublicKey = config.publicKey || "";
-      if (!pushPublicKey || Notification.permission === "denied") return;
+      if (!pushPublicKey) return;
+      if ("Notification" in window && Notification.permission === "denied") return;
       notificationPrompt.hidden = false;
+      if (!("Notification" in window) || !("PushManager" in window) || !("serviceWorker" in navigator)) {
+        enableNotifications.disabled = true;
+        setNotificationStatus("Push notifications are unavailable here. Use iOS 16.4+ and open the installed Home Screen app.");
+        return;
+      }
       if (Notification.permission === "granted" && nicknameInput.value.trim()) await subscribeToPush();
     } catch (_) {}
   }

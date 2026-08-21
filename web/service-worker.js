@@ -1,4 +1,4 @@
-const CACHE_NAME = "backup-chat-shell-v5";
+const CACHE_NAME = "backup-chat-shell-v6";
 const APP_SHELL = [
   "/",
   "/app.js",
