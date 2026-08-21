@@ -42,3 +42,7 @@ needed. The `backup-chat-data` volume and tunnel configuration remain intact.
 
 Rollback: deploy the previous Git revision with the same command. The
 persistent volume is unaffected.
+
+Result: succeeded. The chat image was rebuilt and its container was recreated;
+the Cloudflare Tunnel container and persistent volume remained running. HTTPS
+served the dark stylesheet and the updated service-worker cache version.
