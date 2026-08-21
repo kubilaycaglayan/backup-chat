@@ -12,6 +12,7 @@ This repository contains a minimal Go backup chat application intended for two u
 * Keep external dependencies to an absolute minimum.
 * Do not introduce Docker, databases, frontend frameworks, CSS frameworks, message queues, or unnecessary infrastructure.
 * Do not overengineer this application.
+* Commit regularly.
 
 ## Task Specifications
 
