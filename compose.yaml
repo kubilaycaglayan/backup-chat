@@ -1,0 +1,28 @@
+services:
+  backup-chat:
+    build: .
+    restart: unless-stopped
+    networks:
+      - backup-chat-net
+    volumes:
+      - backup-chat-data:/data
+    environment:
+      VAPID_PUBLIC_KEY:
+      VAPID_PRIVATE_KEY:
+      VAPID_SUBJECT:
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    networks:
+      - backup-chat-net
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN}
+
+networks:
+  backup-chat-net:
+    name: backup-chat-net
+
+volumes:
+  backup-chat-data:
+    external: true
+    name: backup-chat-data

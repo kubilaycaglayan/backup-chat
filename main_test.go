@@ -65,6 +65,18 @@ not-json
 	}
 }
 
+func TestConfiguredVAPIDSubject(t *testing.T) {
+	t.Setenv("VAPID_SUBJECT", "mailto:chat@example.com")
+	if got, err := configuredVAPIDSubject("mailto:backup-chat@localhost"); err != nil || got != "mailto:chat@example.com" {
+		t.Fatalf("configuredVAPIDSubject() = %q, %v", got, err)
+	}
+
+	t.Setenv("VAPID_SUBJECT", "chat.example.com")
+	if _, err := configuredVAPIDSubject("mailto:backup-chat@localhost"); err == nil {
+		t.Fatal("expected a bare hostname to be rejected")
+	}
+}
+
 func tooLong(length int) string {
 	value := make([]rune, length)
 	for i := range value {

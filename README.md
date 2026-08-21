@@ -9,9 +9,9 @@ go build -o backup-chat
 ./backup-chat
 ```
 
-Configuration defaults to `PORT=50000`, `DATA_FILE=./data/messages.jsonl`, and `RETENTION_DAYS=30`. The server listens on all interfaces. Open `http://SERVER_PUBLIC_IP:50000` in a browser after allowing the port through any applicable firewall, router, or cloud firewall.
+Configuration defaults to `PORT=50000`, `DATA_FILE=./data/messages.jsonl`, and `RETENTION_DAYS=30`. For local development, open `http://localhost:50000` in a browser.
 
-To serve HTTPS directly from the Go application on the same port, set `TLS_CERT_FILE` and `TLS_KEY_FILE` to a trusted certificate and private key. When both are set, the application serves `https://SERVER_PUBLIC_IP:50000`; when omitted, it serves HTTP as before.
+For the deployed service, use the Cloudflare Tunnel configuration below. Cloudflare provides public HTTPS and forwards the connection to the private HTTP service in Docker.
 
 ## systemd
 
@@ -25,12 +25,6 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now backup-chat
 ```
 
-If needed, allow the default port with UFW:
-
-```bash
-sudo ufw allow 50000/tcp
-```
-
 Inspect application logs with:
 
 ```bash
@@ -39,42 +33,45 @@ sudo journalctl -u backup-chat -f
 
 Persistent messages are stored in `data/messages.jsonl` for a local run, or `/opt/backup-chat/data/messages.jsonl` with the included systemd unit. Messages older than 30 days are removed at startup and approximately once per day using an atomic file replacement.
 
-## Docker
+## Docker deployment through Cloudflare Tunnel
 
-Build and run the container with a named volume so messages survive container replacement:
+To publish the chat through a Cloudflare Tunnel, do not expose port 50000 with
+`-p`. The chat and tunnel share a private Docker network, while `cloudflared`
+makes the outbound connection to Cloudflare. This means no router port
+forwarding or public firewall rule is required for the chat port.
 
-```bash
-docker build -t backup-chat .
-docker volume create backup-chat-data
-docker run -d \
-  --name backup-chat \
-  --restart unless-stopped \
-  -p 50000:50000 \
-  -v backup-chat-data:/data \
-  backup-chat
-```
+In Cloudflare, create a named tunnel and add a published application route with
+the hostname stored in `CHAT_HOSTNAME` and service URL
+`http://backup-chat:50000`. Wait until the Cloudflare zone is **Active** before
+using the route.
 
-With certificate files mounted from the host:
-
-```bash
-docker run -d \
-  --name backup-chat \
-  --restart unless-stopped \
-  -p 50000:50000 \
-  -v backup-chat-data:/data \
-  -v /etc/letsencrypt/live/SERVER_PUBLIC_IP:/certs:ro \
-  -e TLS_CERT_FILE=/certs/fullchain.pem \
-  -e TLS_KEY_FILE=/certs/privkey.pem \
-  backup-chat
-```
-
-Open `http://SERVER_PUBLIC_IP:50000`. Allow TCP port 50000 through any applicable firewall, router, or cloud firewall. View container logs with:
+The VAPID variables and tunnel token must be exported in the shell that runs
+Docker Compose; do not put their values in this repository. `VAPID_SUBJECT`
+must be a contact URI, such as `mailto:you@example.com` or
+`https://$CHAT_HOSTNAME`, not the bare hostname.
 
 ```bash
-docker logs -f backup-chat
+export CHAT_HOSTNAME='chat.example.com'
+export VAPID_SUBJECT='mailto:you@example.com'
+read -r -s -p "Cloudflare tunnel token: " CLOUDFLARE_TUNNEL_TOKEN
+echo
+export CLOUDFLARE_TUNNEL_TOKEN
+docker volume inspect backup-chat-data >/dev/null 2>&1 || docker volume create backup-chat-data
+docker compose up -d --build
+unset CLOUDFLARE_TUNNEL_TOKEN
 ```
 
-The Docker image stores persistent messages at `/data/messages.jsonl`, backed by the `backup-chat-data` volume. You can override configuration with `-e`, for example `-e RETENTION_DAYS=14`.
+The Compose file creates the private `backup-chat-net` network and persistent
+`backup-chat-data` volume. The volume preserves messages, VAPID keys, and push
+subscriptions across container replacement. Neither container publishes port
+50000 to the host.
+
+Check the deployment with:
+
+```bash
+docker compose ps
+docker compose logs --tail=100 cloudflared backup-chat
+```
 
 ## Install as a PWA
 

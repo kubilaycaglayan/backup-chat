@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,9 +65,13 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 		if privateKey == "" {
 			return vapidConfig{}, errors.New("VAPID_PRIVATE_KEY is required with VAPID_PUBLIC_KEY")
 		}
+		subject, err := configuredVAPIDSubject("mailto:backup-chat@localhost")
+		if err != nil {
+			return vapidConfig{}, err
+		}
 		log.Print("push: using VAPID keys from environment")
 		return vapidConfig{
-			Subject:    configuredVAPIDSubject("mailto:backup-chat@localhost"),
+			Subject:    subject,
 			PublicKey:  publicKey,
 			PrivateKey: privateKey,
 		}, nil
@@ -76,7 +81,10 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 	if err == nil {
 		var config vapidConfig
 		if json.Unmarshal(data, &config) == nil && config.PublicKey != "" && config.PrivateKey != "" {
-			configuredSubject := configuredVAPIDSubject(config.Subject)
+			configuredSubject, err := configuredVAPIDSubject(config.Subject)
+			if err != nil {
+				return vapidConfig{}, err
+			}
 			if configuredSubject != config.Subject {
 				log.Print("push: using VAPID subject from environment")
 				config.Subject = configuredSubject
@@ -94,8 +102,12 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 	if err != nil {
 		return vapidConfig{}, fmt.Errorf("generating VAPID keys: %w", err)
 	}
+	subject, err := configuredVAPIDSubject("mailto:backup-chat@localhost")
+	if err != nil {
+		return vapidConfig{}, err
+	}
 	config := vapidConfig{
-		Subject:    configuredVAPIDSubject("mailto:backup-chat@localhost"),
+		Subject:    subject,
 		PublicKey:  publicKey,
 		PrivateKey: privateKey,
 	}
@@ -106,8 +118,23 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 	return config, nil
 }
 
-func configuredVAPIDSubject(fallback string) string {
-	return envOrDefault("VAPID_SUBJECT", fallback)
+func configuredVAPIDSubject(fallback string) (string, error) {
+	subject := envOrDefault("VAPID_SUBJECT", fallback)
+	parsed, err := url.ParseRequestURI(subject)
+	if err != nil {
+		return "", fmt.Errorf("VAPID_SUBJECT must be a mailto: or https: contact URI: %w", err)
+	}
+	switch parsed.Scheme {
+	case "mailto":
+		if parsed.Opaque != "" {
+			return subject, nil
+		}
+	case "https":
+		if parsed.Host != "" {
+			return subject, nil
+		}
+	}
+	return "", errors.New("VAPID_SUBJECT must be a mailto: or https: contact URI")
 }
 
 func (s *pushStore) loadSubscriptions() error {
