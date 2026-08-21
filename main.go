@@ -232,7 +232,7 @@ func websocketHandler(store *messageStore, hub *chatHub, push *pushStore) http.H
 		WriteBufferSize: 1024,
 		CheckOrigin: func(request *http.Request) bool {
 			origin := request.Header.Get("Origin")
-			if origin == "" {
+			if origin == "" || origin == "null" {
 				return true
 			}
 			return strings.EqualFold(origin, "http://"+request.Host) || strings.EqualFold(origin, "https://"+request.Host)

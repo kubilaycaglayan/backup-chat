@@ -23,7 +23,8 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+  // WebSocket upgrades must bypass the service worker, especially in installed PWAs.
+  if (event.request.method !== "GET" || event.request.mode === "websocket") return;
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
   );
