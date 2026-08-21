@@ -78,6 +78,11 @@
         setNotificationStatus("Notifications are blocked. Allow them for this app in iOS Settings.");
         return;
       }
+      if (!window.isSecureContext) {
+        enableNotifications.disabled = true;
+        setNotificationStatus("Notifications require HTTPS. Open the installed app from an HTTPS address.");
+        return;
+      }
       if (!("Notification" in window) || !("PushManager" in window) || !("serviceWorker" in navigator)) {
         enableNotifications.disabled = true;
         setNotificationStatus("Push notifications are unavailable here. Use iOS 16.4+ and open the installed Home Screen app.");
