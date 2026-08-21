@@ -72,8 +72,12 @@
       const config = await response.json();
       pushPublicKey = config.publicKey || "";
       if (!pushPublicKey) return;
-      if ("Notification" in window && Notification.permission === "denied") return;
       notificationPrompt.hidden = false;
+      if ("Notification" in window && Notification.permission === "denied") {
+        enableNotifications.disabled = true;
+        setNotificationStatus("Notifications are blocked. Allow them for this app in iOS Settings.");
+        return;
+      }
       if (!("Notification" in window) || !("PushManager" in window) || !("serviceWorker" in navigator)) {
         enableNotifications.disabled = true;
         setNotificationStatus("Push notifications are unavailable here. Use iOS 16.4+ and open the installed Home Screen app.");
