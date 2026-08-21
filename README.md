@@ -59,3 +59,9 @@ docker logs -f backup-chat
 ```
 
 The Docker image stores persistent messages at `/data/messages.jsonl`, backed by the `backup-chat-data` volume. You can override configuration with `-e`, for example `-e RETENTION_DAYS=14`.
+
+## Install as a PWA
+
+The app includes a web manifest, service worker, standalone display mode, and home-screen icon. Remote phones must access it over HTTPS for service workers and offline app-shell caching; `localhost` is also treated as secure for local testing.
+
+On iPhone or iPad, open the HTTPS URL in Safari or Chrome, use the Share menu, choose **Add to Home Screen**, and confirm. Open the new Home Screen icon to use the standalone app layout. The chat still requires a live connection to send and receive messages; the service worker only caches the application shell.

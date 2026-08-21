@@ -1,0 +1,18 @@
+{
+  "name": "Backup Chat",
+  "short_name": "Chat",
+  "description": "A simple shared backup chat.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f4f7",
+  "theme_color": "#1769aa",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

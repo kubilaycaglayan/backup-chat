@@ -1,4 +1,6 @@
 (() => {
+  const nicknameStorageKey = "backup-chat-nickname";
+  const nicknameStorageLifetime = 24 * 60 * 60 * 1000;
   const nicknameScreen = document.querySelector("#nickname-screen");
   const chatScreen = document.querySelector("#chat-screen");
   const nicknameForm = document.querySelector("#nickname-form");
@@ -11,6 +13,28 @@
   const connectionStatus = document.querySelector("#connection-status");
   let nickname = "";
   let socket;
+
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+
+  function loadSavedNickname() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(nicknameStorageKey));
+      if (saved && typeof saved.nickname === "string" && typeof saved.savedAt === "number" &&
+          Date.now() - saved.savedAt < nicknameStorageLifetime) {
+        return saved.nickname;
+      }
+      localStorage.removeItem(nicknameStorageKey);
+    } catch (_) {
+      return "";
+    }
+    return "";
+  }
+
+  function saveNickname(value) {
+    try {
+      localStorage.setItem(nicknameStorageKey, JSON.stringify({ nickname: value, savedAt: Date.now() }));
+    } catch (_) {}
+  }
 
   function showError(element, message) { element.textContent = message || ""; }
 
@@ -44,10 +68,13 @@
     });
   }
 
+  nicknameInput.value = loadSavedNickname();
+
   nicknameForm.addEventListener("submit", (event) => {
     event.preventDefault();
     nickname = nicknameInput.value.trim();
     if (!nickname || [...nickname].length > 32) { showError(nicknameError, "Use a nickname between 1 and 32 characters."); return; }
+    saveNickname(nickname);
     showError(nicknameError, "");
     nicknameScreen.hidden = true;
     chatScreen.hidden = false;

@@ -34,7 +34,7 @@ const (
 	messageInterval    = 500 * time.Millisecond
 )
 
-//go:embed web/index.html web/app.js web/style.css
+//go:embed web/index.html web/app.js web/style.css web/manifest.webmanifest web/service-worker.js web/icon.svg
 var webFiles embed.FS
 
 type Message struct {

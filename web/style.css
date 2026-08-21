@@ -24,18 +24,21 @@ form button { margin-top: .75rem; }
 .composer button { margin: 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 480px) {
-  html, body { height: 100%; }
-  body { min-height: 100dvh; height: 100dvh; padding: 0; overflow: hidden; }
-  .app { width: 100%; height: 100%; }
-  .card { min-height: 0; height: 100%; border: 0; border-radius: 0; }
-  .chat { display: flex; flex-direction: column; }
-  .chat header { flex: 0 0 auto; }
-  .messages { flex: 1 1 auto; min-height: 0; height: auto; }
-  .composer { flex: 0 0 auto; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  body { position: fixed; inset: 0; min-height: 100svh; height: 100svh; padding: 0; display: block; }
+  .app { width: 100%; height: 100svh; max-width: none; }
+  #nickname-screen { height: auto; margin: 0; }
+  .card { min-height: 0; border: 0; border-radius: 0; }
+  .chat.card { position: fixed; inset: 0; z-index: 1; width: 100%; height: 100svh; max-height: 100svh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; padding: 0; overflow: hidden; }
+  .chat header { min-width: 0; }
+  .messages { min-height: 0; height: auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+  #chat-error { margin: .4rem 1rem; }
+  .composer { min-width: 0; padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
+  .composer input { min-width: 0; }
 }
 
-@supports not (height: 100dvh) {
+@supports not (height: 100svh) {
   @media (max-width: 480px) {
-    body { min-height: 100vh; height: 100vh; }
+    body, .app, .chat.card { min-height: 100vh; height: 100vh; max-height: 100vh; }
   }
 }
