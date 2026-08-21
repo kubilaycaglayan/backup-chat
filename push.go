@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,6 +63,7 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 		if privateKey == "" {
 			return vapidConfig{}, errors.New("VAPID_PRIVATE_KEY is required with VAPID_PUBLIC_KEY")
 		}
+		log.Print("push: using VAPID keys from environment")
 		return vapidConfig{
 			Subject:    envOrDefault("VAPID_SUBJECT", "mailto:backup-chat@localhost"),
 			PublicKey:  publicKey,
@@ -73,6 +75,7 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 	if err == nil {
 		var config vapidConfig
 		if json.Unmarshal(data, &config) == nil && config.PublicKey != "" && config.PrivateKey != "" {
+			log.Print("push: loaded VAPID keys from persistent storage")
 			return config, nil
 		}
 		return vapidConfig{}, fmt.Errorf("invalid VAPID key file %s", path)
@@ -93,6 +96,7 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 	if err := writeJSONAtomically(path, config, 0600); err != nil {
 		return vapidConfig{}, fmt.Errorf("saving VAPID keys: %w", err)
 	}
+	log.Print("push: generated new VAPID keys")
 	return config, nil
 }
 
@@ -101,6 +105,7 @@ func (s *pushStore) loadSubscriptions() error {
 	defer s.mu.Unlock()
 	data, err := os.ReadFile(s.subscriptionsPath)
 	if errors.Is(err, os.ErrNotExist) {
+		log.Print("push: no saved subscriptions")
 		return nil
 	}
 	if err != nil {
@@ -116,7 +121,13 @@ func (s *pushStore) loadSubscriptions() error {
 		}
 	}
 	s.subscriptions = filtered
+	log.Printf("push: loaded %d subscription(s)", len(s.subscriptions))
 	return nil
+}
+
+func subscriptionID(subscription webpush.Subscription) string {
+	digest := sha256.Sum256([]byte(subscription.Endpoint))
+	return fmt.Sprintf("%x", digest[:6])
 }
 
 func validPushSubscription(subscription webpush.Subscription) bool {
@@ -156,10 +167,21 @@ func (s *pushStore) saveLocked() error {
 	return writeJSONAtomically(s.subscriptionsPath, s.subscriptions, 0600)
 }
 
+func (s *pushStore) count() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.subscriptions)
+}
+
 func (s *pushStore) send(message Message) {
 	s.mu.Lock()
 	subscriptions := append([]storedPushSubscription(nil), s.subscriptions...)
 	s.mu.Unlock()
+	if len(subscriptions) == 0 {
+		log.Printf("push: no subscriptions available for message from %q", message.Nickname)
+		return
+	}
+	log.Printf("push: delivering notification for message from %q to %d subscription(s)", message.Nickname, len(subscriptions))
 	payload, err := json.Marshal(map[string]string{
 		"title": "Backup Chat",
 		"body":  message.Nickname + ": " + message.Message,
@@ -170,9 +192,12 @@ func (s *pushStore) send(message Message) {
 		return
 	}
 	for _, subscription := range subscriptions {
+		id := subscriptionID(subscription.Subscription)
 		if subscription.Nickname == message.Nickname {
+			log.Printf("push: skipping sender subscription id=%s", id)
 			continue
 		}
+		log.Printf("push: sending notification recipient=%q id=%s", subscription.Nickname, id)
 		response, err := webpush.SendNotification(payload, &subscription.Subscription, &webpush.Options{
 			Subscriber:      s.config.Subject,
 			VAPIDPublicKey:  s.config.PublicKey,
@@ -180,14 +205,21 @@ func (s *pushStore) send(message Message) {
 			TTL:             60,
 		})
 		if err != nil {
-			log.Printf("sending push notification: %v", err)
+			log.Printf("push: delivery failed recipient=%q id=%s: %v", subscription.Nickname, id, err)
 			continue
 		}
 		status := response.StatusCode
 		_ = response.Body.Close()
+		if status >= http.StatusOK && status < http.StatusMultipleChoices {
+			log.Printf("push: delivery accepted recipient=%q id=%s status=%d", subscription.Nickname, id, status)
+		} else {
+			log.Printf("push: delivery rejected recipient=%q id=%s status=%d", subscription.Nickname, id, status)
+		}
 		if status == http.StatusGone || status == http.StatusNotFound {
 			if err := s.remove(subscription.Subscription.Endpoint); err != nil {
-				log.Printf("removing expired push subscription: %v", err)
+				log.Printf("push: removing expired subscription id=%s: %v", id, err)
+			} else {
+				log.Printf("push: removed expired subscription id=%s", id)
 			}
 		}
 	}
@@ -232,6 +264,7 @@ func writeJSONAtomically(path string, value any, mode os.FileMode) error {
 
 func pushConfigHandler(push *pushStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		log.Print("push: configuration requested")
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]string{"publicKey": push.config.PublicKey})
 	}
@@ -240,6 +273,7 @@ func pushConfigHandler(push *pushStore) http.HandlerFunc {
 func pushSubscribeHandler(push *pushStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
+			log.Printf("push: rejected subscription request method=%s", r.Method)
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
@@ -247,19 +281,22 @@ func pushSubscribeHandler(push *pushStore) http.HandlerFunc {
 		decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8192))
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&request); err != nil {
+			log.Printf("push: rejected malformed subscription request: %v", err)
 			http.Error(w, "invalid subscription", http.StatusBadRequest)
 			return
 		}
 		nickname, err := validateNickname(request.Nickname)
 		if err != nil || !validPushSubscription(request.Subscription) {
+			log.Printf("push: rejected invalid subscription nickname=%q", request.Nickname)
 			http.Error(w, "invalid subscription", http.StatusBadRequest)
 			return
 		}
 		if err := push.add(storedPushSubscription{Nickname: nickname, Subscription: request.Subscription}); err != nil {
-			log.Printf("saving push subscription: %v", err)
+			log.Printf("push: saving subscription nickname=%q id=%s: %v", nickname, subscriptionID(request.Subscription), err)
 			http.Error(w, "could not save subscription", http.StatusInternalServerError)
 			return
 		}
+		log.Printf("push: saved subscription nickname=%q id=%s total=%d", nickname, subscriptionID(request.Subscription), push.count())
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

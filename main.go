@@ -184,6 +184,7 @@ func validateMessage(message string) (string, error) {
 
 type chatClient struct {
 	connection *websocket.Conn
+	nickname   string
 	writeMu    sync.Mutex
 }
 
@@ -258,9 +259,15 @@ func websocketHandler(store *messageStore, hub *chatHub, push *pushStore) http.H
 		// The HTTP server's response timeout must not expire an otherwise idle chat.
 		_ = connection.UnderlyingConn().SetReadDeadline(time.Time{})
 		_ = connection.UnderlyingConn().SetWriteDeadline(time.Time{})
-		client := &chatClient{connection: connection}
+		client := &chatClient{connection: connection, nickname: nickname}
+		log.Printf("websocket: connected nickname=%q", nickname)
 		defer connection.Close()
 		defer hub.remove(client)
+		defer log.Printf("websocket: closed nickname=%q", nickname)
+		connection.SetPongHandler(func(string) error {
+			log.Printf("websocket: keepalive pong nickname=%q", nickname)
+			return nil
+		})
 		keepAliveDone := make(chan struct{})
 		defer close(keepAliveDone)
 		go keepWebSocketAlive(client, keepAliveDone)
@@ -271,15 +278,18 @@ func websocketHandler(store *messageStore, hub *chatHub, push *pushStore) http.H
 		}
 		for _, message := range history {
 			if err := client.send(message); err != nil {
+				log.Printf("websocket: sending history nickname=%q: %v", nickname, err)
 				return
 			}
 		}
+		log.Printf("websocket: sent %d history message(s) nickname=%q", len(history), nickname)
 		hub.add(client)
 		connection.SetReadLimit(maxWebSocketBytes)
 		var lastMessage time.Time
 		for {
 			var incoming incomingMessage
 			if err := readJSONMessage(connection, &incoming); err != nil {
+				log.Printf("websocket: read ended nickname=%q: %v", nickname, err)
 				return
 			}
 			if !lastMessage.IsZero() && time.Since(lastMessage) < messageInterval {
@@ -313,9 +323,11 @@ func keepWebSocketAlive(client *chatClient, done <-chan struct{}) {
 			return
 		case <-ticker.C:
 			if err := client.ping(); err != nil {
+				log.Printf("websocket: keepalive ping failed nickname=%q: %v", client.nickname, err)
 				_ = client.connection.Close()
 				return
 			}
+			log.Printf("websocket: keepalive ping nickname=%q", client.nickname)
 		}
 	}
 }

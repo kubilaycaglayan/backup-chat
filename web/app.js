@@ -20,7 +20,21 @@
   let reconnectTimer;
   let reconnectAttempts = 0;
 
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+  function logPush(message, details) {
+    if (details === undefined) console.info(`[push] ${message}`);
+    else console.info(`[push] ${message}`, details);
+  }
+
+  function logConnection(message, details) {
+    if (details === undefined) console.info(`[websocket] ${message}`);
+    else console.info(`[websocket] ${message}`, details);
+  }
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/service-worker.js")
+      .then(() => logPush("service worker registered"))
+      .catch((error) => console.warn("[push] service worker registration failed", error));
+  }
 
   function setNotificationStatus(message) { notificationStatus.textContent = message || ""; }
 
@@ -39,6 +53,7 @@
     }
     try {
       const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+      logPush("notification permission", permission);
       if (permission !== "granted") {
         setNotificationStatus("Notifications are not enabled.");
         notificationPrompt.hidden = true;
@@ -51,6 +66,9 @@
           userVisibleOnly: true,
           applicationServerKey: base64ToBytes(pushPublicKey)
         });
+        logPush("created browser push subscription");
+      } else {
+        logPush("using existing browser push subscription");
       }
       const serialized = subscription.toJSON();
       const response = await fetch("/push/subscribe", {
@@ -61,9 +79,12 @@
           subscription: { endpoint: serialized.endpoint, keys: serialized.keys }
         })
       });
+      logPush("subscription API response", response.status);
       if (!response.ok) throw new Error("subscription request failed");
       notificationPrompt.hidden = true;
-    } catch (_) {
+      logPush("push subscription saved");
+    } catch (error) {
+      console.warn("[push] subscription failed", error);
       setNotificationStatus("Notifications could not be enabled. Try again later.");
     }
   }
@@ -71,8 +92,11 @@
   async function setupNotifications() {
     try {
       const response = await fetch("/push/config");
+      logPush("configuration API response", response.status);
+      if (!response.ok) throw new Error("configuration request failed");
       const config = await response.json();
       pushPublicKey = config.publicKey || "";
+      logPush("configuration received", { hasPublicKey: Boolean(pushPublicKey) });
       if (!pushPublicKey) return;
       notificationPrompt.hidden = false;
       if ("Notification" in window && Notification.permission === "denied") {
@@ -91,7 +115,9 @@
         return;
       }
       if (Notification.permission === "granted" && nicknameInput.value.trim()) await subscribeToPush();
-    } catch (_) {}
+    } catch (error) {
+      console.warn("[push] setup failed", error);
+    }
   }
 
   function loadSavedNickname() {
@@ -126,6 +152,7 @@
     if (!nickname || reconnectTimer) return;
     const delay = Math.min(1000 * 2 ** reconnectAttempts, 15000);
     reconnectAttempts += 1;
+    logConnection("reconnect scheduled", { attempt: reconnectAttempts, delay });
     connectionStatus.textContent = "Reconnecting…";
     reconnectTimer = setTimeout(() => {
       reconnectTimer = undefined;
@@ -149,23 +176,30 @@
   }
 
   function connect() {
-    if (!nickname || (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN))) return;
+    if (!nickname || (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN))) {
+      logConnection("connection attempt skipped", { hasNickname: Boolean(nickname), readyState: socket && socket.readyState });
+      return;
+    }
     clearReconnectTimer();
     connectionStatus.textContent = "Connecting…";
     messages.textContent = "";
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+    logConnection("connecting");
     const connection = new WebSocket(`${protocol}//${location.host}/ws?nickname=${encodeURIComponent(nickname)}`);
     socket = connection;
     connection.addEventListener("open", () => {
       if (socket !== connection) return;
       reconnectAttempts = 0;
+      logConnection("connected");
       connectionStatus.textContent = "Connected";
       if (!document.hidden) messageInput.focus();
     });
-    connection.addEventListener("close", () => {
+    connection.addEventListener("close", (event) => {
+      logConnection("closed", { code: event.code, reason: event.reason || "none", wasClean: event.wasClean });
       if (socket === connection) scheduleReconnect();
     });
     connection.addEventListener("error", () => {
+      logConnection("connection error");
       if (socket === connection) connectionStatus.textContent = "Connection failed";
     });
     connection.addEventListener("message", (event) => {
@@ -195,9 +229,13 @@
   });
 
   document.addEventListener("visibilitychange", () => {
+    logConnection("visibility changed", document.hidden ? "hidden" : "visible");
     if (!document.hidden) connect();
   });
-  window.addEventListener("online", connect);
+  window.addEventListener("online", () => {
+    logConnection("network online");
+    connect();
+  });
 
   messageForm.addEventListener("submit", (event) => {
     event.preventDefault();
