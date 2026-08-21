@@ -25,3 +25,20 @@ removed, the `backup-chat-data` volume was retained, and Compose created
 `backup-chat-net` with replacement chat and Cloudflare Tunnel containers. The
 chat container has no host-published port. HTTPS through the configured tunnel
 returned a successful response.
+
+## 2026-08-21 23:53 UTC — Redeploy the dark default interface
+
+Purpose: rebuild and restart the chat container so the dark interface is served
+through the existing Cloudflare Tunnel.
+
+Planned command:
+
+```bash
+. /home/ubuntu/.profile && docker compose up -d --build
+```
+
+Expected effects: rebuilds the chat image and recreates the chat container if
+needed. The `backup-chat-data` volume and tunnel configuration remain intact.
+
+Rollback: deploy the previous Git revision with the same command. The
+persistent volume is unaffected.
