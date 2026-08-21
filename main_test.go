@@ -36,25 +36,39 @@ func TestMessageJSONLAndRetention(t *testing.T) {
 	path := filepath.Join(temporary, "messages.jsonl")
 	store := &messageStore{path: path, retention: 30 * 24 * time.Hour}
 	now := time.Date(2026, 8, 21, 12, 0, 0, 0, time.UTC)
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil { t.Fatal(err) }
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		t.Fatal(err)
+	}
 	content := `{"timestamp":"2026-08-20T12:00:00Z","nickname":"Alex","message":"recent"}
 {"timestamp":"2026-07-20T11:59:59Z","nickname":"Alex","message":"expired"}
 not-json
 `
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 	history, err := store.history(now)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(history) != 1 || history[0].Message != "recent" || history[0].Timestamp.Location() != time.UTC {
 		t.Fatalf("unexpected history: %#v", history)
 	}
-	if err := store.cleanup(now); err != nil { t.Fatal(err) }
+	if err := store.cleanup(now); err != nil {
+		t.Fatal(err)
+	}
 	cleaned, err := store.history(now)
-	if err != nil { t.Fatal(err) }
-	if len(cleaned) != 1 || cleaned[0].Message != "recent" { t.Fatalf("unexpected cleaned history: %#v", cleaned) }
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cleaned) != 1 || cleaned[0].Message != "recent" {
+		t.Fatalf("unexpected cleaned history: %#v", cleaned)
+	}
 }
 
 func tooLong(length int) string {
 	value := make([]rune, length)
-	for i := range value { value[i] = 'x' }
+	for i := range value {
+		value[i] = 'x'
+	}
 	return string(value)
 }

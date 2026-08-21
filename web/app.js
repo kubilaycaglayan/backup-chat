@@ -6,6 +6,9 @@
   const nicknameForm = document.querySelector("#nickname-form");
   const nicknameInput = document.querySelector("#nickname");
   const nicknameError = document.querySelector("#nickname-error");
+  const notificationPrompt = document.querySelector("#notification-prompt");
+  const enableNotifications = document.querySelector("#enable-notifications");
+  const notificationStatus = document.querySelector("#notification-status");
   const messageForm = document.querySelector("#message-form");
   const messageInput = document.querySelector("#message");
   const messages = document.querySelector("#messages");
@@ -13,8 +16,67 @@
   const connectionStatus = document.querySelector("#connection-status");
   let nickname = "";
   let socket;
+  let pushPublicKey = "";
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/service-worker.js").catch(() => {});
+
+  function setNotificationStatus(message) { notificationStatus.textContent = message || ""; }
+
+  function base64ToBytes(value) {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+    const binary = atob(padded);
+    return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  }
+
+  async function subscribeToPush() {
+    const chosenNickname = nicknameInput.value.trim();
+    if (!chosenNickname || [...chosenNickname].length > 32) {
+      setNotificationStatus("Choose a nickname first, then enable notifications.");
+      return;
+    }
+    try {
+      const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
+      if (permission !== "granted") {
+        setNotificationStatus("Notifications are not enabled.");
+        notificationPrompt.hidden = true;
+        return;
+      }
+      const registration = await navigator.serviceWorker.ready;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: base64ToBytes(pushPublicKey)
+        });
+      }
+      const serialized = subscription.toJSON();
+      const response = await fetch("/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nickname: chosenNickname,
+          subscription: { endpoint: serialized.endpoint, keys: serialized.keys }
+        })
+      });
+      if (!response.ok) throw new Error("subscription request failed");
+      notificationPrompt.hidden = true;
+    } catch (_) {
+      setNotificationStatus("Notifications could not be enabled. Try again later.");
+    }
+  }
+
+  async function setupNotifications() {
+    if (!("Notification" in window) || !("PushManager" in window) || !("serviceWorker" in navigator)) return;
+    try {
+      const response = await fetch("/push/config");
+      const config = await response.json();
+      pushPublicKey = config.publicKey || "";
+      if (!pushPublicKey || Notification.permission === "denied") return;
+      notificationPrompt.hidden = false;
+      if (Notification.permission === "granted" && nicknameInput.value.trim()) await subscribeToPush();
+    } catch (_) {}
+  }
 
   function loadSavedNickname() {
     try {
@@ -69,6 +131,9 @@
   }
 
   nicknameInput.value = loadSavedNickname();
+  setupNotifications();
+
+  enableNotifications.addEventListener("click", subscribeToPush);
 
   nicknameForm.addEventListener("submit", (event) => {
     event.preventDefault();

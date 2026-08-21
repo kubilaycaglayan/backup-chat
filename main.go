@@ -25,13 +25,13 @@ import (
 )
 
 const (
-	defaultPort         = "50000"
-	defaultDataFile    = "./data/messages.jsonl"
-	defaultRetention    = 30
-	maxNicknameRunes   = 32
-	maxMessageRunes    = 2000
-	maxWebSocketBytes  = 8192
-	messageInterval    = 500 * time.Millisecond
+	defaultPort       = "50000"
+	defaultDataFile   = "./data/messages.jsonl"
+	defaultRetention  = 30
+	maxNicknameRunes  = 32
+	maxMessageRunes   = 2000
+	maxWebSocketBytes = 8192
+	messageInterval   = 500 * time.Millisecond
 )
 
 //go:embed web/index.html web/app.js web/style.css web/manifest.webmanifest web/service-worker.js web/icon.svg
@@ -215,7 +215,9 @@ func (h *chatHub) remove(client *chatClient) {
 func (h *chatHub) broadcast(message Message) {
 	h.mu.RLock()
 	clients := make([]*chatClient, 0, len(h.clients))
-	for client := range h.clients { clients = append(clients, client) }
+	for client := range h.clients {
+		clients = append(clients, client)
+	}
 	h.mu.RUnlock()
 	for _, client := range clients {
 		if err := client.send(message); err != nil {
@@ -224,21 +226,28 @@ func (h *chatHub) broadcast(message Message) {
 	}
 }
 
-func websocketHandler(store *messageStore, hub *chatHub) http.HandlerFunc {
+func websocketHandler(store *messageStore, hub *chatHub, push *pushStore) http.HandlerFunc {
 	upgrader := websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 		CheckOrigin: func(request *http.Request) bool {
 			origin := request.Header.Get("Origin")
-			if origin == "" { return true }
+			if origin == "" {
+				return true
+			}
 			return strings.EqualFold(origin, "http://"+request.Host) || strings.EqualFold(origin, "https://"+request.Host)
 		},
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		nickname, err := validateNickname(r.URL.Query().Get("nickname"))
-		if err != nil { http.Error(w, err.Error(), http.StatusBadRequest); return }
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		connection, err := upgrader.Upgrade(w, r, nil)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 		// The HTTP server's response timeout must not expire an otherwise idle chat.
 		_ = connection.UnderlyingConn().SetReadDeadline(time.Time{})
 		_ = connection.UnderlyingConn().SetWriteDeadline(time.Time{})
@@ -246,16 +255,23 @@ func websocketHandler(store *messageStore, hub *chatHub) http.HandlerFunc {
 		defer connection.Close()
 		defer hub.remove(client)
 		history, err := store.history(time.Now().UTC())
-		if err != nil { log.Printf("loading history: %v", err); return }
+		if err != nil {
+			log.Printf("loading history: %v", err)
+			return
+		}
 		for _, message := range history {
-			if err := client.send(message); err != nil { return }
+			if err := client.send(message); err != nil {
+				return
+			}
 		}
 		hub.add(client)
 		connection.SetReadLimit(maxWebSocketBytes)
 		var lastMessage time.Time
 		for {
 			var incoming incomingMessage
-			if err := readJSONMessage(connection, &incoming); err != nil { return }
+			if err := readJSONMessage(connection, &incoming); err != nil {
+				return
+			}
 			if !lastMessage.IsZero() && time.Since(lastMessage) < messageInterval {
 				_ = client.send(map[string]string{"error": "please wait before sending another message"})
 				continue
@@ -273,6 +289,7 @@ func websocketHandler(store *messageStore, hub *chatHub) http.HandlerFunc {
 			}
 			lastMessage = time.Now()
 			hub.broadcast(message)
+			go push.send(message)
 		}
 	}
 }
@@ -306,23 +323,35 @@ func staticHandler() http.Handler {
 }
 
 func envOrDefault(name, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(name)); value != "" { return value }
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
 	return fallback
 }
 
 func retentionFromEnv() time.Duration {
 	days, err := strconv.Atoi(envOrDefault("RETENTION_DAYS", strconv.Itoa(defaultRetention)))
-	if err != nil || days < 1 { days = defaultRetention }
+	if err != nil || days < 1 {
+		days = defaultRetention
+	}
 	return time.Duration(days) * 24 * time.Hour
 }
 
 func main() {
 	store := &messageStore{path: envOrDefault("DATA_FILE", defaultDataFile), retention: retentionFromEnv()}
-	if err := store.prepare(); err != nil { log.Fatalf("preparing message store: %v", err) }
+	if err := store.prepare(); err != nil {
+		log.Fatalf("preparing message store: %v", err)
+	}
+	push, err := newPushStore(store.path)
+	if err != nil {
+		log.Fatalf("preparing push notifications: %v", err)
+	}
 
 	hub := newChatHub()
 	mux := http.NewServeMux()
-	mux.HandleFunc("/ws", websocketHandler(store, hub))
+	mux.HandleFunc("/ws", websocketHandler(store, hub, push))
+	mux.HandleFunc("/push/config", pushConfigHandler(push))
+	mux.HandleFunc("/push/subscribe", pushSubscribeHandler(push))
 	mux.Handle("/", staticHandler())
 	server := &http.Server{
 		Addr:              ":" + envOrDefault("PORT", defaultPort),
@@ -340,12 +369,16 @@ func main() {
 		defer ticker.Stop()
 		defer close(cleanupDone)
 		for range ticker.C {
-			if err := store.cleanup(time.Now().UTC()); err != nil { log.Printf("cleaning message store: %v", err) }
+			if err := store.cleanup(time.Now().UTC()); err != nil {
+				log.Printf("cleaning message store: %v", err)
+			}
 		}
 	}()
 	go func() {
 		log.Printf("listening on %s", server.Addr)
-		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) { log.Fatalf("server: %v", err) }
+		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("server: %v", err)
+		}
 	}()
 
 	signals := make(chan os.Signal, 1)
@@ -354,13 +387,20 @@ func main() {
 	signal.Stop(signals)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := server.Shutdown(ctx); err != nil { log.Printf("shutting down server: %v", err) }
-	select { case <-cleanupDone: case <-ctx.Done(): }
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("shutting down server: %v", err)
+	}
+	select {
+	case <-cleanupDone:
+	case <-ctx.Done():
+	}
 }
 
 func limitRequestBody(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Body != nil { r.Body = http.MaxBytesReader(w, r.Body, 16*1024) }
+		if r.Body != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, 16*1024)
+		}
 		next.ServeHTTP(w, r)
 	})
 }

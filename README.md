@@ -65,3 +65,11 @@ The Docker image stores persistent messages at `/data/messages.jsonl`, backed by
 The app includes a web manifest, service worker, standalone display mode, and home-screen icon. Remote phones must access it over HTTPS for service workers and offline app-shell caching; `localhost` is also treated as secure for local testing.
 
 On iPhone or iPad, open the HTTPS URL in Safari or Chrome, use the Share menu, choose **Add to Home Screen**, and confirm. Open the new Home Screen icon to use the standalone app layout. The chat still requires a live connection to send and receive messages; the service worker only caches the application shell.
+
+## Push notifications
+
+When supported, the app shows an **Enable notifications** prompt on first launch. Permission must be granted by pressing that button; browsers do not allow notification permission to be requested automatically. New messages notify subscribed devices belonging to the other nickname.
+
+The server generates a VAPID key pair on first startup and stores it next to the configured message file in `messages.jsonl.vapid.json`. Keep that file with the message data so existing subscriptions remain valid. It is private and should not be committed or exposed. Alternatively, provide `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and optionally `VAPID_SUBJECT` as environment variables.
+
+Push notifications require HTTPS on remote devices. iOS requires iOS 16.4 or later and the site must be installed on the Home Screen before push permission is available.

@@ -10,6 +10,9 @@ input { width: 100%; padding: .7rem; border: 1px solid #adb5bd; border-radius: 6
 button { padding: .7rem 1rem; border: 0; border-radius: 6px; color: white; background: #1769aa; font: inherit; cursor: pointer; }
 form button { margin-top: .75rem; }
 .error { min-height: 1.25rem; color: #b42318; margin: .4rem 0; }
+.notification-prompt { margin: 1rem 0; padding: .9rem; border: 1px solid #b9d9ef; border-radius: 8px; background: #eef8ff; }
+.notification-prompt p { margin: .35rem 0 .6rem; }
+.notification-prompt .status { min-height: 1.25rem; color: #667085; }
 .chat { padding: 0; overflow: hidden; }
 .chat header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid #d9dee5; }
 .chat header h1 { margin: 0; }
