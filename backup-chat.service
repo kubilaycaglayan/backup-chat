@@ -1,0 +1,18 @@
+[Unit]
+Description=Backup Chat
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/backup-chat
+ExecStart=/opt/backup-chat/backup-chat
+Restart=on-failure
+RestartSec=5
+Environment=PORT=50000
+Environment=DATA_FILE=/opt/backup-chat/data/messages.jsonl
+Environment=RETENTION_DAYS=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

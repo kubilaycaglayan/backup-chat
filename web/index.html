@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Backup Chat</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="app">
+    <section id="nickname-screen" class="card">
+      <h1>Backup Chat</h1>
+      <p>Choose a nickname to enter the shared chat.</p>
+      <form id="nickname-form">
+        <label for="nickname">Nickname</label>
+        <input id="nickname" name="nickname" maxlength="32" autocomplete="nickname" required autofocus>
+        <p id="nickname-error" class="error" role="alert"></p>
+        <button type="submit">Enter chat</button>
+      </form>
+    </section>
+
+    <section id="chat-screen" class="chat card" hidden>
+      <header><h1>Backup Chat</h1><span id="connection-status">Connecting…</span></header>
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <p id="chat-error" class="error" role="alert"></p>
+      <form id="message-form" class="composer">
+        <label class="visually-hidden" for="message">Message</label>
+        <input id="message" name="message" maxlength="2000" autocomplete="off" placeholder="Write a message…" required>
+        <button type="submit">Send</button>
+      </form>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

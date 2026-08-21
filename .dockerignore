@@ -1,0 +1,9 @@
+.git
+.humans
+.agents
+.codex
+data/*.jsonl
+backup-chat
+Dockerfile
+README.md
+*.log
