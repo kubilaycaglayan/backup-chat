@@ -376,7 +376,18 @@ func main() {
 	}()
 	go func() {
 		log.Printf("listening on %s", server.Addr)
-		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		var err error
+		certificateFile := strings.TrimSpace(os.Getenv("TLS_CERT_FILE"))
+		keyFile := strings.TrimSpace(os.Getenv("TLS_KEY_FILE"))
+		if certificateFile != "" || keyFile != "" {
+			if certificateFile == "" || keyFile == "" {
+				log.Fatal("TLS_CERT_FILE and TLS_KEY_FILE must be set together")
+			}
+			err = server.ListenAndServeTLS(certificateFile, keyFile)
+		} else {
+			err = server.ListenAndServe()
+		}
+		if !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("server: %v", err)
 		}
 	}()

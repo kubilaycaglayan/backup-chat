@@ -11,6 +11,8 @@ go build -o backup-chat
 
 Configuration defaults to `PORT=50000`, `DATA_FILE=./data/messages.jsonl`, and `RETENTION_DAYS=30`. The server listens on all interfaces. Open `http://SERVER_PUBLIC_IP:50000` in a browser after allowing the port through any applicable firewall, router, or cloud firewall.
 
+To serve HTTPS directly from the Go application on the same port, set `TLS_CERT_FILE` and `TLS_KEY_FILE` to a trusted certificate and private key. When both are set, the application serves `https://SERVER_PUBLIC_IP:50000`; when omitted, it serves HTTP as before.
+
 ## systemd
 
 The included unit assumes the application is installed under `/opt/backup-chat`:
@@ -49,6 +51,20 @@ docker run -d \
   --restart unless-stopped \
   -p 50000:50000 \
   -v backup-chat-data:/data \
+  backup-chat
+```
+
+With certificate files mounted from the host:
+
+```bash
+docker run -d \
+  --name backup-chat \
+  --restart unless-stopped \
+  -p 50000:50000 \
+  -v backup-chat-data:/data \
+  -v /etc/letsencrypt/live/SERVER_PUBLIC_IP:/certs:ro \
+  -e TLS_CERT_FILE=/certs/fullchain.pem \
+  -e TLS_KEY_FILE=/certs/privkey.pem \
   backup-chat
 ```
 
