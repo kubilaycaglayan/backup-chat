@@ -25,13 +25,14 @@ import (
 )
 
 const (
-	defaultPort       = "50000"
-	defaultDataFile   = "./data/messages.jsonl"
-	defaultRetention  = 30
-	maxNicknameRunes  = 32
-	maxMessageRunes   = 2000
-	maxWebSocketBytes = 8192
-	messageInterval   = 500 * time.Millisecond
+	defaultPort        = "50000"
+	defaultDataFile    = "./data/messages.jsonl"
+	defaultRetention   = 30
+	maxNicknameRunes   = 32
+	maxMessageRunes    = 2000
+	maxWebSocketBytes  = 8192
+	messageInterval    = 500 * time.Millisecond
+	websocketPingEvery = 20 * time.Second
 )
 
 //go:embed web/index.html web/app.js web/style.css web/manifest.webmanifest web/service-worker.js web/icon.svg
@@ -193,6 +194,12 @@ func (c *chatClient) send(value any) error {
 	return c.connection.WriteJSON(value)
 }
 
+func (c *chatClient) ping() error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return c.connection.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second))
+}
+
 type chatHub struct {
 	mu      sync.RWMutex
 	clients map[*chatClient]struct{}
@@ -254,6 +261,9 @@ func websocketHandler(store *messageStore, hub *chatHub, push *pushStore) http.H
 		client := &chatClient{connection: connection}
 		defer connection.Close()
 		defer hub.remove(client)
+		keepAliveDone := make(chan struct{})
+		defer close(keepAliveDone)
+		go keepWebSocketAlive(client, keepAliveDone)
 		history, err := store.history(time.Now().UTC())
 		if err != nil {
 			log.Printf("loading history: %v", err)
@@ -290,6 +300,22 @@ func websocketHandler(store *messageStore, hub *chatHub, push *pushStore) http.H
 			lastMessage = time.Now()
 			hub.broadcast(message)
 			go push.send(message)
+		}
+	}
+}
+
+func keepWebSocketAlive(client *chatClient, done <-chan struct{}) {
+	ticker := time.NewTicker(websocketPingEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			if err := client.ping(); err != nil {
+				_ = client.connection.Close()
+				return
+			}
 		}
 	}
 }

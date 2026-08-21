@@ -17,6 +17,8 @@
   let nickname = "";
   let socket;
   let pushPublicKey = "";
+  let reconnectTimer;
+  let reconnectAttempts = 0;
 
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/service-worker.js").catch(() => {});
 
@@ -114,6 +116,23 @@
 
   function showError(element, message) { element.textContent = message || ""; }
 
+  function clearReconnectTimer() {
+    if (!reconnectTimer) return;
+    clearTimeout(reconnectTimer);
+    reconnectTimer = undefined;
+  }
+
+  function scheduleReconnect() {
+    if (!nickname || reconnectTimer) return;
+    const delay = Math.min(1000 * 2 ** reconnectAttempts, 15000);
+    reconnectAttempts += 1;
+    connectionStatus.textContent = "Reconnecting…";
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = undefined;
+      connect();
+    }, delay);
+  }
+
   function addMessage(message) {
     const item = document.createElement("article");
     item.className = message.nickname === nickname ? "message own" : "message";
@@ -130,12 +149,27 @@
   }
 
   function connect() {
+    if (!nickname || (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN))) return;
+    clearReconnectTimer();
+    connectionStatus.textContent = "Connecting…";
+    messages.textContent = "";
     const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-    socket = new WebSocket(`${protocol}//${location.host}/ws?nickname=${encodeURIComponent(nickname)}`);
-    socket.addEventListener("open", () => { connectionStatus.textContent = "Connected"; messageInput.focus(); });
-    socket.addEventListener("close", () => { connectionStatus.textContent = "Disconnected"; });
-    socket.addEventListener("error", () => { showError(chatError, "Connection failed. Please reload the page."); });
-    socket.addEventListener("message", (event) => {
+    const connection = new WebSocket(`${protocol}//${location.host}/ws?nickname=${encodeURIComponent(nickname)}`);
+    socket = connection;
+    connection.addEventListener("open", () => {
+      if (socket !== connection) return;
+      reconnectAttempts = 0;
+      connectionStatus.textContent = "Connected";
+      if (!document.hidden) messageInput.focus();
+    });
+    connection.addEventListener("close", () => {
+      if (socket === connection) scheduleReconnect();
+    });
+    connection.addEventListener("error", () => {
+      if (socket === connection) connectionStatus.textContent = "Connection failed";
+    });
+    connection.addEventListener("message", (event) => {
+      if (socket !== connection) return;
       try {
         const value = JSON.parse(event.data);
         if (value.error) showError(chatError, value.error);
@@ -159,6 +193,11 @@
     chatScreen.hidden = false;
     connect();
   });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) connect();
+  });
+  window.addEventListener("online", connect);
 
   messageForm.addEventListener("submit", (event) => {
     event.preventDefault();
