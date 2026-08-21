@@ -29,8 +29,8 @@ form button { margin-top: .75rem; }
 @media (max-width: 480px) {
   html, body { width: 100%; height: 100%; overflow: hidden; }
   body { position: fixed; inset: 0; min-height: 100svh; height: 100svh; padding: 0; display: block; }
-  .app { width: 100%; height: 100svh; max-width: none; }
-  #nickname-screen { height: auto; margin: 0; }
+  .app { width: 100%; height: 100svh; max-width: none; display: flex; align-items: center; justify-content: center; padding: 1rem; overflow: auto; }
+  #nickname-screen { width: 100%; height: auto; max-height: 100%; margin: 0; overflow-y: auto; }
   .card { min-height: 0; border: 0; border-radius: 0; }
   .chat.card { position: fixed; inset: 0; z-index: 1; width: 100%; height: 100svh; max-height: 100svh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; padding: 0; overflow: hidden; }
   .chat header { min-width: 0; }
