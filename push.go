@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -65,7 +66,7 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 		}
 		log.Print("push: using VAPID keys from environment")
 		return vapidConfig{
-			Subject:    envOrDefault("VAPID_SUBJECT", "mailto:backup-chat@localhost"),
+			Subject:    configuredVAPIDSubject("mailto:backup-chat@localhost"),
 			PublicKey:  publicKey,
 			PrivateKey: privateKey,
 		}, nil
@@ -75,6 +76,11 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 	if err == nil {
 		var config vapidConfig
 		if json.Unmarshal(data, &config) == nil && config.PublicKey != "" && config.PrivateKey != "" {
+			configuredSubject := configuredVAPIDSubject(config.Subject)
+			if configuredSubject != config.Subject {
+				log.Print("push: using VAPID subject from environment")
+				config.Subject = configuredSubject
+			}
 			log.Print("push: loaded VAPID keys from persistent storage")
 			return config, nil
 		}
@@ -89,7 +95,7 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 		return vapidConfig{}, fmt.Errorf("generating VAPID keys: %w", err)
 	}
 	config := vapidConfig{
-		Subject:    envOrDefault("VAPID_SUBJECT", "mailto:backup-chat@localhost"),
+		Subject:    configuredVAPIDSubject("mailto:backup-chat@localhost"),
 		PublicKey:  publicKey,
 		PrivateKey: privateKey,
 	}
@@ -98,6 +104,10 @@ func loadVAPIDConfig(path string) (vapidConfig, error) {
 	}
 	log.Print("push: generated new VAPID keys")
 	return config, nil
+}
+
+func configuredVAPIDSubject(fallback string) string {
+	return envOrDefault("VAPID_SUBJECT", fallback)
 }
 
 func (s *pushStore) loadSubscriptions() error {
@@ -209,11 +219,12 @@ func (s *pushStore) send(message Message) {
 			continue
 		}
 		status := response.StatusCode
+		responseBody, _ := io.ReadAll(io.LimitReader(response.Body, 1024))
 		_ = response.Body.Close()
 		if status >= http.StatusOK && status < http.StatusMultipleChoices {
 			log.Printf("push: delivery accepted recipient=%q id=%s status=%d", subscription.Nickname, id, status)
 		} else {
-			log.Printf("push: delivery rejected recipient=%q id=%s status=%d", subscription.Nickname, id, status)
+			log.Printf("push: delivery rejected recipient=%q id=%s status=%d body=%q", subscription.Nickname, id, status, responseBody)
 		}
 		if status == http.StatusGone || status == http.StatusNotFound {
 			if err := s.remove(subscription.Subscription.Endpoint); err != nil {

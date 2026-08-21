@@ -45,6 +45,11 @@
     return Uint8Array.from(binary, (character) => character.charCodeAt(0));
   }
 
+  function sameBytes(first, second) {
+    if (first.length !== second.length) return false;
+    return first.every((value, index) => value === second[index]);
+  }
+
   async function subscribeToPush() {
     const chosenNickname = nicknameInput.value.trim();
     if (!chosenNickname || [...chosenNickname].length > 32) {
@@ -61,6 +66,12 @@
       }
       const registration = await navigator.serviceWorker.ready;
       let subscription = await registration.pushManager.getSubscription();
+    const subscriptionKey = subscription && subscription.options && subscription.options.applicationServerKey;
+    if (subscriptionKey && !sameBytes(new Uint8Array(subscriptionKey), base64ToBytes(pushPublicKey))) {
+    logPush("replacing browser push subscription after VAPID key change");
+    await subscription.unsubscribe();
+    subscription = null;
+    }
       if (!subscription) {
         subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,

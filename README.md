@@ -88,4 +88,6 @@ When supported, the app shows an **Enable notifications** prompt on first launch
 
 The server generates a VAPID key pair on first startup and stores it next to the configured message file in `messages.jsonl.vapid.json`. Keep that file with the message data so existing subscriptions remain valid. It is private and should not be committed or exposed. Alternatively, provide `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and optionally `VAPID_SUBJECT` as environment variables.
 
+For iPhone and iPad web push, set `VAPID_SUBJECT` to a real contact URI, such as `mailto:you@example.com` or `https://example.com`. Apple rejects localhost-style VAPID subjects with HTTP 403.
+
 Push notifications require HTTPS on remote devices. iOS requires iOS 16.4 or later and the site must be installed on the Home Screen before push permission is available.
