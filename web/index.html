@@ -17,12 +17,6 @@
     <section id="nickname-screen" class="card">
       <h1>Backup Chat</h1>
       <p>Choose a nickname to enter the shared chat.</p>
-      <div id="notification-prompt" class="notification-prompt" hidden>
-        <strong>Enable message notifications?</strong>
-        <p>Get an alert when a new message arrives while the app is closed.</p>
-        <button id="enable-notifications" type="button">Enable notifications</button>
-        <p id="notification-status" class="status" role="status"></p>
-      </div>
       <form id="nickname-form">
         <label for="nickname">Nickname</label>
         <input id="nickname" name="nickname" maxlength="32" autocomplete="nickname" required>
@@ -33,6 +27,12 @@
 
     <section id="chat-screen" class="chat card" hidden>
       <header><h1>Backup Chat</h1><span id="connection-status">Connecting…</span></header>
+      <div id="notification-prompt" class="notification-prompt" hidden>
+        <strong>Enable message notifications?</strong>
+        <p>Get an alert when the chat is not open.</p>
+        <button id="enable-notifications" type="button">Enable notifications</button>
+        <p id="notification-status" class="status" role="status"></p>
+      </div>
       <div id="messages" class="messages" aria-live="polite"></div>
       <p id="chat-error" class="error" role="alert"></p>
       <form id="message-form" class="composer">

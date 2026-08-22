@@ -46,3 +46,172 @@ persistent volume is unaffected.
 Result: succeeded. The chat image was rebuilt and its container was recreated;
 the Cloudflare Tunnel container and persistent volume remained running. HTTPS
 served the dark stylesheet and the updated service-worker cache version.
+
+## 2026-08-22 00:01 UTC — Start the local development environment
+
+Purpose: run the isolated development chat environment for local review before
+deployment.
+
+Planned command:
+
+```bash
+docker compose -f compose.dev.yaml up -d
+```
+
+Expected effects: creates or starts only the `backup-chat-dev` Compose project,
+with a local-only `127.0.0.1:50001` port and the `backup-chat-dev-data` volume.
+Production containers and the `backup-chat-data` volume are unaffected.
+
+Rollback: run `docker compose -f compose.dev.yaml down`. To also remove
+development messages and generated development push keys, use
+`docker compose -f compose.dev.yaml down -v`.
+
+Result: succeeded. The `backup-chat-dev` container is listening only on
+`127.0.0.1:50001` and returned a successful HTTP response. The pre-existing
+development volume was reused; production containers and data were unaffected.
+
+## 2026-08-22 00:06 UTC — Restart the development environment
+
+Purpose: compile and serve the updated local cache-control behavior.
+
+Planned command:
+
+```bash
+docker compose -f compose.dev.yaml restart
+```
+
+Expected effects: restarts only the local `backup-chat-dev` chat container.
+Production containers and persistent data are unaffected.
+
+Rollback: run `docker compose -f compose.dev.yaml down`.
+
+Result: succeeded. The development app is serving service-worker cache revision
+`backup-chat-shell-v11` and the explicit five-row chat layout.
+
+## 2026-08-22 00:35 UTC — Deploy notification layout update
+
+Purpose: deploy the corrected in-chat notification prompt layout and PWA cache
+revision to production.
+
+Planned command:
+
+```bash
+docker compose up -d --build --no-deps backup-chat
+```
+
+Expected effects: rebuilds and replaces only the production chat container. The
+Cloudflare Tunnel container, `backup-chat-net` network, and
+`backup-chat-data` volume remain in place.
+
+Rollback: rebuild and start the previous Git revision with the same command.
+Persistent chat data is unaffected.
+
+Result: succeeded. The production chat container was rebuilt and restarted,
+serving service-worker cache revision `backup-chat-shell-v11` and the explicit
+five-row chat layout. The Cloudflare Tunnel container remained running and
+persistent chat data was retained.
+
+Result: succeeded. The development app is serving service-worker cache revision
+`backup-chat-shell-v10` and returned a successful local HTTP response.
+
+## 2026-08-22 00:22 UTC — Redeploy the current production build
+
+Purpose: rebuild and restart the production chat container so the current PWA
+cache revision is served to installed clients.
+
+Planned command:
+
+```bash
+docker compose up -d --build --no-deps backup-chat
+```
+
+Expected effects: rebuilds and replaces only the production chat container. The
+Cloudflare Tunnel container, `backup-chat-net` network, and
+`backup-chat-data` volume remain in place.
+
+Rollback: rebuild and start the previous Git revision with the same command.
+Persistent chat data is unaffected.
+
+Result: succeeded. Docker confirmed that the production image already matched
+the current working tree, so the chat container remained running. It serves
+service-worker cache revision `backup-chat-shell-v10` and the current chat
+notification prompt.
+
+## 2026-08-22 00:34 UTC — Restart development for notification layout review
+
+Purpose: compile and serve the corrected notification prompt layout and updated
+PWA cache revision in the local development environment.
+
+Planned command:
+
+```bash
+docker compose -f compose.dev.yaml restart
+```
+
+Expected effects: restarts only the local `backup-chat-dev` chat container.
+Production containers and persistent data are unaffected.
+
+Rollback: run `docker compose -f compose.dev.yaml down`.
+
+Result: succeeded. The production chat container was rebuilt and restarted,
+serving service-worker cache revision `backup-chat-shell-v10`. The Cloudflare
+Tunnel container remained running and persistent chat data was retained.
+
+## 2026-08-22 00:31 UTC — Deploy the latest application changes
+
+Purpose: rebuild and restart the production chat container with the current
+working tree.
+
+Planned command:
+
+```bash
+docker compose up -d --build --no-deps backup-chat
+```
+
+Expected effects: rebuilds and replaces only the production chat container. The
+Cloudflare Tunnel container, `backup-chat-net` network, and
+`backup-chat-data` volume remain in place.
+
+Rollback: rebuild and start the previous Git revision with the same command.
+Persistent chat data is unaffected.
+
+Result: succeeded. The local stylesheet response now includes
+`Cache-Control: no-cache`.
+
+## 2026-08-22 00:08 UTC — Deploy browser-cache revalidation
+
+Purpose: deploy the verified asset revalidation fix so production users receive
+updated frontend assets without a hard refresh.
+
+Planned command:
+
+```bash
+docker compose up -d --build --no-deps backup-chat
+```
+
+Expected effects: rebuilds and replaces only the production chat container. The
+Cloudflare Tunnel container, `backup-chat-net` network, and
+`backup-chat-data` volume remain in place.
+
+Rollback: rebuild and start the previous Git revision with the same command.
+Persistent chat data is unaffected.
+
+Result: succeeded. The production chat container was rebuilt and restarted; its
+stylesheet response includes `Cache-Control: no-cache`. The Cloudflare Tunnel
+container remained running and the persistent chat data volume was retained.
+
+## 2026-08-22 00:15 UTC — Restart the development environment
+
+Purpose: compile the updated PWA cache, nickname, and notification behavior for
+local review.
+
+Planned command:
+
+```bash
+docker compose -f compose.dev.yaml restart
+```
+
+Expected effects: restarts only the local `backup-chat-dev` chat container.
+Production containers and persistent data are unaffected.
+
+Rollback: run `docker compose -f compose.dev.yaml down`.

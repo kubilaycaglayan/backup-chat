@@ -1,4 +1,4 @@
-const CACHE_NAME = "backup-chat-shell-v9";
+const CACHE_NAME = "backup-chat-shell-v11";
 const APP_SHELL = [
   "/",
   "/app.js",
@@ -38,16 +38,19 @@ self.addEventListener("push", (event) => {
   } catch (_) {
     data = { body: event.data ? event.data.text() : "New message" };
   }
-  event.waitUntil(
-    self.registration.showNotification(data.title || "Backup Chat", {
+  event.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    if (windows.some((window) => window.visibilityState === "visible")) {
+      console.info("[push] notification skipped because the app is open");
+      return;
+    }
+    return self.registration.showNotification(data.title || "Backup Chat", {
       body: data.body || "New message",
       icon: "/icon.svg",
       badge: "/icon.svg",
       tag: "backup-chat-message",
       data: { url: data.url || "/" }
-    }).then(() => console.info("[push] notification displayed"))
-      .catch((error) => console.error("[push] notification display failed", error))
-  );
+    }).then(() => console.info("[push] notification displayed"));
+  }).catch((error) => console.error("[push] notification handling failed", error)));
 });
 
 self.addEventListener("notificationclick", (event) => {

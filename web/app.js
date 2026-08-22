@@ -1,6 +1,5 @@
 (() => {
   const nicknameStorageKey = "backup-chat-nickname";
-  const nicknameStorageLifetime = 24 * 60 * 60 * 1000;
   const nicknameScreen = document.querySelector("#nickname-screen");
   const chatScreen = document.querySelector("#chat-screen");
   const nicknameForm = document.querySelector("#nickname-form");
@@ -51,8 +50,7 @@
   }
 
   async function subscribeToPush() {
-    const chosenNickname = nicknameInput.value.trim();
-    if (!chosenNickname || [...chosenNickname].length > 32) {
+    if (!nickname || [...nickname].length > 32) {
       setNotificationStatus("Choose a nickname first, then enable notifications.");
       return;
     }
@@ -86,7 +84,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nickname: chosenNickname,
+          nickname,
           subscription: { endpoint: serialized.endpoint, keys: serialized.keys }
         })
       });
@@ -100,6 +98,28 @@
     }
   }
 
+  function showNotificationPrompt() {
+    if (!nickname || !pushPublicKey) return;
+    notificationPrompt.hidden = false;
+    if ("Notification" in window && Notification.permission === "denied") {
+      enableNotifications.disabled = true;
+      setNotificationStatus("Notifications are blocked. Allow them for this app in iOS Settings.");
+      return;
+    }
+    if (!window.isSecureContext) {
+      enableNotifications.disabled = true;
+      setNotificationStatus("Notifications require HTTPS. Open the installed app from an HTTPS address.");
+      return;
+    }
+    if (!("Notification" in window) || !("PushManager" in window) || !("serviceWorker" in navigator)) {
+      enableNotifications.disabled = true;
+      setNotificationStatus("Push notifications are unavailable here. Use iOS 16.4+ and open the installed Home Screen app.");
+      return;
+    }
+    enableNotifications.disabled = false;
+    setNotificationStatus("");
+  }
+
   async function setupNotifications() {
     try {
       const response = await fetch("/push/config");
@@ -109,23 +129,7 @@
       pushPublicKey = config.publicKey || "";
       logPush("configuration received", { hasPublicKey: Boolean(pushPublicKey) });
       if (!pushPublicKey) return;
-      notificationPrompt.hidden = false;
-      if ("Notification" in window && Notification.permission === "denied") {
-        enableNotifications.disabled = true;
-        setNotificationStatus("Notifications are blocked. Allow them for this app in iOS Settings.");
-        return;
-      }
-      if (!window.isSecureContext) {
-        enableNotifications.disabled = true;
-        setNotificationStatus("Notifications require HTTPS. Open the installed app from an HTTPS address.");
-        return;
-      }
-      if (!("Notification" in window) || !("PushManager" in window) || !("serviceWorker" in navigator)) {
-        enableNotifications.disabled = true;
-        setNotificationStatus("Push notifications are unavailable here. Use iOS 16.4+ and open the installed Home Screen app.");
-        return;
-      }
-      if (Notification.permission === "granted" && nicknameInput.value.trim()) await subscribeToPush();
+      showNotificationPrompt();
     } catch (error) {
       console.warn("[push] setup failed", error);
     }
@@ -134,8 +138,7 @@
   function loadSavedNickname() {
     try {
       const saved = JSON.parse(localStorage.getItem(nicknameStorageKey));
-      if (saved && typeof saved.nickname === "string" && typeof saved.savedAt === "number" &&
-          Date.now() - saved.savedAt < nicknameStorageLifetime) {
+      if (saved && typeof saved.nickname === "string") {
         return saved.nickname;
       }
       localStorage.removeItem(nicknameStorageKey);
@@ -236,6 +239,7 @@
     showError(nicknameError, "");
     nicknameScreen.hidden = true;
     chatScreen.hidden = false;
+    showNotificationPrompt();
     connect();
   });
 

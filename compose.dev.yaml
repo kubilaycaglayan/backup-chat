@@ -1,0 +1,19 @@
+name: backup-chat-dev
+
+services:
+  backup-chat:
+    image: golang:1.22-alpine
+    working_dir: /src
+    command: go run .
+    ports:
+      - "127.0.0.1:50001:50000"
+    volumes:
+      - .:/src
+      - backup-chat-dev-data:/data
+    environment:
+      DATA_FILE: /data/messages.jsonl
+      RETENTION_DAYS: 30
+
+volumes:
+  backup-chat-dev-data:
+    name: backup-chat-dev-data

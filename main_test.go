@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -74,6 +75,17 @@ func TestConfiguredVAPIDSubject(t *testing.T) {
 	t.Setenv("VAPID_SUBJECT", "chat.example.com")
 	if _, err := configuredVAPIDSubject("mailto:backup-chat@localhost"); err == nil {
 		t.Fatal("expected a bare hostname to be rejected")
+	}
+}
+
+func TestStaticAssetsMustRevalidate(t *testing.T) {
+	request := httptest.NewRequest("GET", "/style.css", nil)
+	response := httptest.NewRecorder()
+
+	staticHandler().ServeHTTP(response, request)
+
+	if got := response.Header().Get("Cache-Control"); got != "no-cache" {
+		t.Fatalf("Cache-Control = %q, want no-cache", got)
 	}
 }
 

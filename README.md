@@ -11,7 +11,50 @@ go build -o backup-chat
 
 Configuration defaults to `PORT=50000`, `DATA_FILE=./data/messages.jsonl`, and `RETENTION_DAYS=30`. For local development, open `http://localhost:50000` in a browser.
 
-For the deployed service, use the Cloudflare Tunnel configuration below. Cloudflare provides public HTTPS and forwards the connection to the private HTTP service in Docker.
+## Environment variables
+
+Available configuration and deployment variable names:
+
+```text
+PORT
+DATA_FILE
+RETENTION_DAYS
+TLS_CERT_FILE
+TLS_KEY_FILE
+VAPID_PUBLIC_KEY
+VAPID_PRIVATE_KEY
+VAPID_SUBJECT
+CHAT_HOSTNAME
+CLOUDFLARE_TUNNEL_TOKEN
+```
+
+## Development environment
+
+Use the separate development Compose file before deploying a change. It runs
+locally on port 50001, does not start Cloudflare Tunnel, and stores its messages
+in a separate `backup-chat-dev-data` Docker volume.
+
+```bash
+docker compose -f compose.dev.yaml up
+```
+
+Open `http://localhost:50001`. The repository is mounted into the container, so
+the next start uses your current source files. After changing Go code or an
+embedded frontend file, stop the command with `Ctrl+C` and run it again to
+rebuild and restart the application.
+
+To discard only development chat data, run:
+
+```bash
+docker compose -f compose.dev.yaml down -v
+```
+
+The production Compose configuration below uses a different volume and is not
+affected by this command.
+
+For the deployed service, use the Cloudflare Tunnel configuration below.
+Cloudflare provides public HTTPS and forwards the connection to the private HTTP
+service in Docker.
 
 ## systemd
 

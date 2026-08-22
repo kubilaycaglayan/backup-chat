@@ -12,19 +12,20 @@ button { padding: .7rem 1rem; border: 0; border-radius: 6px; color: #fff; backgr
 button:disabled { opacity: .6; cursor: not-allowed; }
 form button { margin-top: .75rem; }
 .error { min-height: 1.25rem; color: #ff7b72; margin: .4rem 0; }
-.notification-prompt { margin: 1rem 0; padding: .9rem; border: 1px solid #1f6feb; border-radius: 8px; background: #0d2847; }
+.notification-prompt { grid-row: 2; position: relative; z-index: 1; margin: 1rem; padding: .9rem; border: 1px solid #1f6feb; border-radius: 8px; background: #0d2847; }
 .notification-prompt p { margin: .35rem 0 .6rem; }
 .notification-prompt .status { min-height: 1.25rem; color: #8b949e; }
-.chat { padding: 0; overflow: hidden; }
+.chat { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; padding: 0; overflow: hidden; }
 .chat header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid #30363d; }
 .chat header h1 { margin: 0; }
 #connection-status { color: #8b949e; font-size: .9rem; }
-.messages { height: min(65vh, 560px); overflow-y: auto; padding: 1rem; }
+.messages { grid-row: 3; min-height: 0; height: min(65vh, 560px); overflow-y: auto; padding: 1rem; }
 .message { max-width: 80%; margin: 0 0 .8rem; padding: .65rem .8rem; border-radius: 8px; background: #21262d; overflow-wrap: anywhere; }
 .message.own { margin-left: auto; background: #0d419d; }
 .message .meta { color: #8b949e; font-size: .78rem; }
 .message p { margin: .25rem 0 0; white-space: pre-wrap; }
-.composer { display: flex; gap: .6rem; padding: 1rem; border-top: 1px solid #30363d; }
+#chat-error { grid-row: 4; }
+.composer { grid-row: 5; display: flex; gap: .6rem; padding: 1rem; border-top: 1px solid #30363d; }
 .composer input { flex: 1; }
 .composer button { margin: 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
@@ -34,7 +35,7 @@ form button { margin-top: .75rem; }
   .app { width: 100%; height: 100svh; max-width: none; display: flex; align-items: center; justify-content: center; padding: 1rem; overflow: auto; }
   #nickname-screen { width: 100%; height: auto; max-height: 100%; margin: 0; overflow-y: auto; }
   .card { min-height: 0; border: 0; border-radius: 0; }
-  .chat.card { position: fixed; inset: 0; z-index: 1; width: 100%; height: 100svh; max-height: 100svh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; padding: 0; overflow: hidden; }
+  .chat.card { position: fixed; inset: 0; z-index: 1; width: 100%; height: 100svh; max-height: 100svh; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; padding: 0; overflow: hidden; }
   .chat header { min-width: 0; }
   .messages { min-height: 0; height: auto; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   #chat-error { margin: .4rem 1rem; }
