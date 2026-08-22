@@ -1,6 +1,6 @@
 (() => {
   const nicknameStorageKey = "backup-chat-nickname";
-  const appVersion = "19";
+  const appVersion = "20";
   const nicknameScreen = document.querySelector("#nickname-screen");
   const chatScreen = document.querySelector("#chat-screen");
   const nicknameForm = document.querySelector("#nickname-form");
@@ -113,6 +113,17 @@
     }
   }
 
+  async function refreshUpdateCheck() {
+    if (serviceWorkerRegistration) {
+      try {
+        await serviceWorkerRegistration.update();
+      } catch (error) {
+        console.warn("[update] service worker update check failed", error);
+      }
+    }
+    await checkForUpdate();
+  }
+
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/service-worker.js", { updateViaCache: "none" })
       .then((registration) => {
@@ -121,7 +132,7 @@
       })
       .then(() => {
         logPush("service worker registered and checked for updates");
-        return checkForUpdate();
+        return refreshUpdateCheck();
       })
       .catch((error) => console.warn("[push] service worker registration failed", error));
 
@@ -129,6 +140,12 @@
       if (updateRequested) window.location.reload();
     });
   }
+
+  // Keep an open chat aware of a deployment without requiring a reload or
+  // foreground/background transition first.
+  setInterval(() => {
+    if (!document.hidden) refreshUpdateCheck();
+  }, 30000);
 
   function setNotificationStatus(message) { notificationStatus.textContent = message || ""; }
 
@@ -384,7 +401,7 @@
     logConnection("visibility changed", document.hidden ? "hidden" : "visible");
     if (!document.hidden) {
       connect();
-      checkForUpdate();
+      refreshUpdateCheck();
     }
   });
   window.addEventListener("online", () => {

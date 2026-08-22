@@ -1,4 +1,4 @@
-self.APP_VERSION = "19";
+self.APP_VERSION = "20";
 
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
