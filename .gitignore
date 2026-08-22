@@ -3,3 +3,4 @@
 /data/messages.jsonl.vapid.json
 /data/messages.jsonl.subscriptions.json
 .humans/TODO.md
+.agents/SYSTEM_CHANGES.md
