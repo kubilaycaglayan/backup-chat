@@ -6,13 +6,20 @@ services:
     working_dir: /src
     command: go run .
     ports:
-      - "127.0.0.1:50001:50000"
+      - "50001:50000"
     volumes:
       - .:/src
       - backup-chat-dev-data:/data
     environment:
       DATA_FILE: /data/messages.jsonl
       RETENTION_DAYS: 30
+
+  cloudflared-dev:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - backup-chat
+    command: tunnel --no-autoupdate --url http://backup-chat:50000
 
 volumes:
   backup-chat-dev-data:
