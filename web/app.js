@@ -1,5 +1,6 @@
 (() => {
   const nicknameStorageKey = "backup-chat-nickname";
+  const appVersion = "19";
   const nicknameScreen = document.querySelector("#nickname-screen");
   const chatScreen = document.querySelector("#chat-screen");
   const nicknameForm = document.querySelector("#nickname-form");
@@ -7,17 +8,89 @@
   const nicknameError = document.querySelector("#nickname-error");
   const notificationPrompt = document.querySelector("#notification-prompt");
   const enableNotifications = document.querySelector("#enable-notifications");
+  const dismissNotifications = document.querySelector("#dismiss-notifications");
   const notificationStatus = document.querySelector("#notification-status");
+  const updateAvailable = document.querySelector("#update-available");
   const messageForm = document.querySelector("#message-form");
   const messageInput = document.querySelector("#message");
   const messages = document.querySelector("#messages");
   const chatError = document.querySelector("#chat-error");
   const connectionStatus = document.querySelector("#connection-status");
+  const app = document.querySelector(".app");
   let nickname = "";
   let socket;
   let pushPublicKey = "";
   let reconnectTimer;
   let reconnectAttempts = 0;
+  let serviceWorkerRegistration;
+  let updateRequested = false;
+
+  function setupLayoutDebugger() {
+    const debugStorageKey = "backup-chat-layout-debug";
+    const requestedMode = new URLSearchParams(window.location.search).get("debug");
+    try {
+      if (requestedMode === "layout") localStorage.setItem(debugStorageKey, "1");
+      if (requestedMode === "off") localStorage.removeItem(debugStorageKey);
+      if (requestedMode !== "layout" && localStorage.getItem(debugStorageKey) !== "1") return;
+    } catch (_) {
+      if (requestedMode !== "layout") return;
+    }
+
+    document.documentElement.classList.add("layout-debug");
+    const panel = document.createElement("pre");
+    panel.className = "layout-debug-panel";
+    panel.setAttribute("aria-live", "off");
+    document.body.append(panel);
+    let lastEvent = "debugger started";
+    let lastTouchY = 0;
+
+    function nameOf(target) {
+      if (target === window) return "window";
+      if (target === document) return "document";
+      if (!(target instanceof Element)) return "unknown";
+      if (target.id) return `#${target.id}`;
+      return target.className ? `.${String(target.className).replace(/\s+/g, ".")}` : target.tagName.toLowerCase();
+    }
+
+    function rounded(value) { return Math.round(Number(value) || 0); }
+
+    function renderLayoutDebug() {
+      const viewport = window.visualViewport;
+      const chatRect = chatScreen.getBoundingClientRect();
+      const composerRect = messageForm.getBoundingClientRect();
+      panel.textContent = [
+        `LAYOUT DEBUG · ${window.matchMedia("(display-mode: standalone)").matches || navigator.standalone ? "standalone" : "browser"}`,
+        "blue=app  pink=chat  green=messages  orange=composer",
+        `screen ${screen.width}×${screen.height}  inner ${innerWidth}×${innerHeight}`,
+        `visual h:${rounded(viewport && viewport.height)} top:${rounded(viewport && viewport.offsetTop)} pageTop:${rounded(viewport && viewport.pageTop)}`,
+        `doc clientH:${document.documentElement.clientHeight} scrollY:${rounded(scrollY)} html:${rounded(document.documentElement.scrollTop)} body:${rounded(document.body.scrollTop)}`,
+        `app scroll:${rounded(app.scrollTop)} h:${rounded(app.clientHeight)}/${rounded(app.scrollHeight)}`,
+        `chat top:${rounded(chatRect.top)} bottom:${rounded(chatRect.bottom)} h:${rounded(chatRect.height)}`,
+        `composer top:${rounded(composerRect.top)} bottom:${rounded(composerRect.bottom)}`,
+        `messages scroll:${rounded(messages.scrollTop)} h:${rounded(messages.clientHeight)}/${rounded(messages.scrollHeight)}`,
+        `active ${nameOf(document.activeElement)}  keyboard:${document.documentElement.classList.contains("keyboard-open")}`,
+        `last ${lastEvent}`
+      ].join("\n");
+    }
+
+    window.addEventListener("scroll", () => { lastEvent = "WINDOW SCROLL"; }, { passive: true });
+    document.addEventListener("scroll", (event) => { lastEvent = `scroll ${nameOf(event.target)}`; }, { capture: true, passive: true });
+    document.addEventListener("touchstart", (event) => {
+      const touch = event.touches[0];
+      lastTouchY = touch ? touch.clientY : 0;
+      lastEvent = `touchstart ${nameOf(event.target)} y:${rounded(lastTouchY)}`;
+    }, { capture: true, passive: true });
+    document.addEventListener("touchmove", (event) => {
+      const touch = event.touches[0];
+      const nextY = touch ? touch.clientY : lastTouchY;
+      lastEvent = `touchmove ${nameOf(event.target)} Δ:${rounded(nextY - lastTouchY)} prevented:${event.defaultPrevented}`;
+      lastTouchY = nextY;
+    }, { passive: true });
+    window.visualViewport?.addEventListener("resize", () => { lastEvent = "visual viewport resize"; }, { passive: true });
+    window.visualViewport?.addEventListener("scroll", () => { lastEvent = "VISUAL VIEWPORT SCROLL"; }, { passive: true });
+    setInterval(renderLayoutDebug, 100);
+    renderLayoutDebug();
+  }
 
   function logPush(message, details) {
     if (details === undefined) console.info(`[push] ${message}`);
@@ -29,11 +102,32 @@
     else console.info(`[websocket] ${message}`, details);
   }
 
+  async function checkForUpdate() {
+    try {
+      const response = await fetch("/version.json", { cache: "no-store" });
+      if (!response.ok) throw new Error("version request failed");
+      const version = (await response.json()).version;
+      updateAvailable.hidden = version === appVersion;
+    } catch (error) {
+      console.warn("[update] version check failed", error);
+    }
+  }
+
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/service-worker.js?v=12", { updateViaCache: "none" })
-      .then((registration) => registration.update())
-      .then(() => logPush("service worker registered and updated"))
+    navigator.serviceWorker.register("/service-worker.js", { updateViaCache: "none" })
+      .then((registration) => {
+        serviceWorkerRegistration = registration;
+        return registration.update();
+      })
+      .then(() => {
+        logPush("service worker registered and checked for updates");
+        return checkForUpdate();
+      })
       .catch((error) => console.warn("[push] service worker registration failed", error));
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (updateRequested) window.location.reload();
+    });
   }
 
   function setNotificationStatus(message) { notificationStatus.textContent = message || ""; }
@@ -99,8 +193,15 @@
     }
   }
 
-  function showNotificationPrompt() {
-    if (!nickname || !pushPublicKey) return;
+  async function updateNotificationPrompt() {
+    if (sessionStorage.getItem("backup-chat-notification-prompt-dismissed") === "1") {
+      notificationPrompt.hidden = true;
+      return;
+    }
+    if (!nickname || !pushPublicKey) {
+      notificationPrompt.hidden = true;
+      return;
+    }
     notificationPrompt.hidden = false;
     if ("Notification" in window && Notification.permission === "denied") {
       enableNotifications.disabled = true;
@@ -117,6 +218,17 @@
       setNotificationStatus("Push notifications are unavailable here. Use iOS 16.4+ and open the installed Home Screen app.");
       return;
     }
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (Notification.permission === "granted" && subscription) {
+        notificationPrompt.hidden = true;
+        setNotificationStatus("");
+        return;
+      }
+    } catch (error) {
+      console.warn("[push] could not check existing subscription", error);
+    }
     enableNotifications.disabled = false;
     setNotificationStatus("");
   }
@@ -130,7 +242,7 @@
       pushPublicKey = config.publicKey || "";
       logPush("configuration received", { hasPublicKey: Boolean(pushPublicKey) });
       if (!pushPublicKey) return;
-      showNotificationPrompt();
+      updateNotificationPrompt();
     } catch (error) {
       console.warn("[push] setup failed", error);
     }
@@ -190,7 +302,7 @@
     if (wasNearBottom) messages.scrollTop = messages.scrollHeight;
   }
 
-  function connect() {
+  function connect(focusComposer = false) {
     if (!nickname || (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN))) {
       logConnection("connection attempt skipped", { hasNickname: Boolean(nickname), readyState: socket && socket.readyState });
       return;
@@ -207,7 +319,7 @@
       reconnectAttempts = 0;
       logConnection("connected");
       connectionStatus.textContent = "Connected";
-      if (!document.hidden) messageInput.focus();
+      if (focusComposer && !document.hidden) messageInput.focus();
     });
     connection.addEventListener("close", (event) => {
       logConnection("closed", { code: event.code, reason: event.reason || "none", wasClean: event.wasClean });
@@ -227,38 +339,98 @@
     });
   }
 
-  nicknameInput.value = loadSavedNickname();
-  setupNotifications();
-
-  enableNotifications.addEventListener("click", subscribeToPush);
-
-  nicknameForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    nickname = nicknameInput.value.trim();
-    if (!nickname || [...nickname].length > 32) { showError(nicknameError, "Use a nickname between 1 and 32 characters."); return; }
+  function enterChat(value, focusComposer) {
+    nickname = value.trim();
+    if (!nickname || [...nickname].length > 32) {
+      showError(nicknameError, "Use a nickname between 1 and 32 characters.");
+      return false;
+    }
     saveNickname(nickname);
     showError(nicknameError, "");
     nicknameScreen.hidden = true;
     chatScreen.hidden = false;
-    showNotificationPrompt();
-    connect();
+    document.body.classList.add("chat-open");
+    updateNotificationPrompt();
+    connect(focusComposer);
+    return true;
+  }
+
+  nicknameInput.value = loadSavedNickname();
+  setupLayoutDebugger();
+  setupNotifications();
+
+  enableNotifications.addEventListener("click", subscribeToPush);
+  dismissNotifications.addEventListener("click", () => {
+    sessionStorage.setItem("backup-chat-notification-prompt-dismissed", "1");
+    notificationPrompt.hidden = true;
   });
+  updateAvailable.addEventListener("click", () => {
+    updateRequested = true;
+    if (serviceWorkerRegistration && serviceWorkerRegistration.waiting) {
+      serviceWorkerRegistration.waiting.postMessage({ type: "SKIP_WAITING" });
+      return;
+    }
+    window.location.reload();
+  });
+
+  nicknameForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    enterChat(nicknameInput.value, true);
+  });
+
+  if (nicknameInput.value.trim()) enterChat(nicknameInput.value, false);
 
   document.addEventListener("visibilitychange", () => {
     logConnection("visibility changed", document.hidden ? "hidden" : "visible");
-    if (!document.hidden) connect();
+    if (!document.hidden) {
+      connect();
+      checkForUpdate();
+    }
   });
   window.addEventListener("online", () => {
     logConnection("network online");
     connect();
   });
 
+  function updateVisualViewport() {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const keyboardOpen = window.innerHeight - viewport.height > 120;
+    document.documentElement.style.setProperty("--app-viewport-height", `${viewport.height}px`);
+    document.documentElement.style.setProperty("--app-viewport-top", `${viewport.offsetTop}px`);
+    document.documentElement.classList.toggle("keyboard-open", keyboardOpen);
+  }
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", updateVisualViewport);
+    window.visualViewport.addEventListener("scroll", updateVisualViewport);
+    updateVisualViewport();
+  }
+
+  messageForm.querySelector("button").addEventListener("pointerdown", (event) => {
+    // iOS moves focus to a tapped button unless its default focus behavior is prevented.
+    event.preventDefault();
+  });
+
+  let messageListTouch = false;
+  chatScreen.addEventListener("touchstart", (event) => {
+    messageListTouch = Boolean(event.target.closest("#messages"));
+  }, { passive: true });
+  chatScreen.addEventListener("touchmove", (event) => {
+    // Safari can otherwise scroll the fixed app shell while the keyboard is open.
+    if (!messageListTouch) event.preventDefault();
+  }, { passive: false });
+  chatScreen.addEventListener("touchend", () => { messageListTouch = false; }, { passive: true });
+  chatScreen.addEventListener("touchcancel", () => { messageListTouch = false; }, { passive: true });
+
   messageForm.addEventListener("submit", (event) => {
     event.preventDefault();
+    const keepKeyboardOpen = document.activeElement === messageInput;
     const message = messageInput.value.trim();
     if (!message || [...message].length > 2000 || !socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify({ message }));
     messageInput.value = "";
     showError(chatError, "");
+    if (keepKeyboardOpen) requestAnimationFrame(() => messageInput.focus({ preventScroll: true }));
   });
 })();

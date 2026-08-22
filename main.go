@@ -35,7 +35,7 @@ const (
 	websocketPingEvery = 20 * time.Second
 )
 
-//go:embed web/index.html web/app.js web/style.css web/manifest.webmanifest web/service-worker.js web/icon.svg
+//go:embed web/index.html web/app.js web/style.css web/manifest.webmanifest web/service-worker.js web/version.json web/icon.svg
 var webFiles embed.FS
 
 type Message struct {
