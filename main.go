@@ -359,10 +359,9 @@ func staticHandler() http.Handler {
 	}
 	files := http.FileServer(http.FS(content))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Revalidate embedded assets on each visit so a new deployment is visible
-		// without requiring users to perform a hard refresh. The service worker
-		// still provides these files when the network is unavailable.
-		w.Header().Set("Cache-Control", "no-cache")
+		// Do not store embedded assets. This lets installed PWAs receive a new
+		// deployment without requiring a hard refresh.
+		w.Header().Set("Cache-Control", "no-store")
 		files.ServeHTTP(w, r)
 	})
 }

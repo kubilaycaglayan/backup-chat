@@ -118,9 +118,9 @@ docker compose logs --tail=100 cloudflared backup-chat
 
 ## Install as a PWA
 
-The app includes a web manifest, service worker, standalone display mode, and home-screen icon. Remote phones must access it over HTTPS for service workers and offline app-shell caching; `localhost` is also treated as secure for local testing.
+The app includes a web manifest, service worker, standalone display mode, and home-screen icon. Remote phones must access it over HTTPS for service workers and push notifications; `localhost` is also treated as secure for local testing.
 
-On iPhone or iPad, open the HTTPS URL in Safari or Chrome, use the Share menu, choose **Add to Home Screen**, and confirm. Open the new Home Screen icon to use the standalone app layout. The chat still requires a live connection to send and receive messages; the service worker only caches the application shell.
+On iPhone or iPad, open the HTTPS URL in Safari or Chrome, use the Share menu, choose **Add to Home Screen**, and confirm. Open the new Home Screen icon to use the standalone app layout. The chat requires a live connection; the service worker is used for push notifications and does not cache the application shell.
 
 ## Push notifications
 

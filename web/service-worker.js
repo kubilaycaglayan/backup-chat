@@ -1,32 +1,12 @@
-const CACHE_NAME = "backup-chat-shell-v11";
-const APP_SHELL = [
-  "/",
-  "/app.js",
-  "/style.css",
-  "/manifest.webmanifest",
-  "/icon.svg",
-  "/service-worker.js"
-];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-    ))
-  );
-  self.clients.claim();
-});
-
-self.addEventListener("fetch", (event) => {
-  // WebSocket upgrades must bypass the service worker, especially in installed PWAs.
-  if (event.request.method !== "GET" || event.request.mode === "websocket") return;
-  event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
+      keys.filter((key) => key.startsWith("backup-chat-shell-")).map((key) => caches.delete(key))
+    )).then(() => self.clients.claim())
   );
 });
 

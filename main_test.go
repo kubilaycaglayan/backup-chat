@@ -84,8 +84,8 @@ func TestStaticAssetsMustRevalidate(t *testing.T) {
 
 	staticHandler().ServeHTTP(response, request)
 
-	if got := response.Header().Get("Cache-Control"); got != "no-cache" {
-		t.Fatalf("Cache-Control = %q, want no-cache", got)
+	if got := response.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("Cache-Control = %q, want no-store", got)
 	}
 }
 

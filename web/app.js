@@ -30,8 +30,9 @@
   }
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/service-worker.js")
-      .then(() => logPush("service worker registered"))
+    navigator.serviceWorker.register("/service-worker.js?v=12", { updateViaCache: "none" })
+      .then((registration) => registration.update())
+      .then(() => logPush("service worker registered and updated"))
       .catch((error) => console.warn("[push] service worker registration failed", error));
   }
 

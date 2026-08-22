@@ -106,10 +106,59 @@ Cloudflare Tunnel container, `backup-chat-net` network, and
 Rollback: rebuild and start the previous Git revision with the same command.
 Persistent chat data is unaffected.
 
+Result: succeeded. The production chat container was rebuilt and restarted.
+Static assets now return `Cache-Control: no-store`, and the production service
+worker has no fetch handler or application-shell precache. The Cloudflare
+Tunnel container remained running and persistent chat data was retained.
+
+## 2026-08-22 00:43 UTC — Deploy deterministic dark frontend assets
+
+Purpose: restart development and deploy explicit dark canvas styling, versioned
+frontend assets, and cache-bypassing service-worker updates.
+
+Planned commands:
+
+```bash
+docker compose -f compose.dev.yaml restart
+docker compose up -d --build --no-deps backup-chat
+```
+
+Expected effects: restarts the local development chat container, then rebuilds
+and replaces only the production chat container. The Cloudflare Tunnel
+container, networks, and persistent data volumes remain in place.
+
+Rollback: rebuild and start the previous Git revision in production with the
+same production command; stop development with
+`docker compose -f compose.dev.yaml down`. Persistent chat data is unaffected.
+
+Result: succeeded. Development and production now serve versioned `v12`
+frontend assets, an explicit dark `html`/`body` canvas, and service-worker
+registration with `updateViaCache: none`. Production static assets return
+`Cache-Control: no-store`; the Cloudflare Tunnel and persistent data remained
+in place.
+
 Result: succeeded. The production chat container was rebuilt and restarted,
 serving service-worker cache revision `backup-chat-shell-v11` and the explicit
 five-row chat layout. The Cloudflare Tunnel container remained running and
 persistent chat data was retained.
+
+## 2026-08-22 00:38 UTC — Deploy PWA cache removal
+
+Purpose: remove application-shell caching from the service worker so installed
+PWAs use the current production assets, while retaining push notifications.
+
+Planned command:
+
+```bash
+docker compose up -d --build --no-deps backup-chat
+```
+
+Expected effects: rebuilds and replaces only the production chat container. The
+Cloudflare Tunnel container, `backup-chat-net` network, and
+`backup-chat-data` volume remain in place.
+
+Rollback: rebuild and start the previous Git revision with the same command.
+Persistent chat data is unaffected.
 
 Result: succeeded. The development app is serving service-worker cache revision
 `backup-chat-shell-v10` and returned a successful local HTTP response.
