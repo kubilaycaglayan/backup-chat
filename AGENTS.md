@@ -206,6 +206,22 @@ Do not print secrets into logs.
 
 Use environment variables for configuration that may contain sensitive values.
 
+## Production Information
+
+Never commit or mention production-specific information anywhere in the
+repository, including documentation, tests, comments, operational logs, commit
+messages, or examples. This includes:
+
+* production domains, hostnames, and public URLs
+* Cloudflare tunnel URLs, tunnel identifiers, and deployment endpoints
+* production IP addresses, ports, service names, and infrastructure paths
+* real environment-variable values or other deployment configuration
+
+Use placeholders such as `example.com`, `HOSTNAME`, and `REPLACE_ME` when an
+example is needed. If a test, deployment, or documentation task requires a real
+production value, stop and ask the user for a safe workaround instead of adding
+the value to the repository.
+
 ## Scope Control
 
 If a requested change can be implemented locally within the repository, do not modify the operating system to accomplish it.
