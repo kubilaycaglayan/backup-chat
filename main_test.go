@@ -1,12 +1,42 @@
 package main
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
+
+func TestAuthenticationIssuesPersistentSession(t *testing.T) {
+	config := authConfig{username: "test-user", password: "test-password"}
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	handler := config.middleware(next)
+
+	unauthorized := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/", nil))
+	if unauthorized.Code != http.StatusUnauthorized || unauthorized.Header().Get("WWW-Authenticate") == "" {
+		t.Fatalf("unauthorized response = %d, challenge = %q", unauthorized.Code, unauthorized.Header().Get("WWW-Authenticate"))
+	}
+
+	login := httptest.NewRequest(http.MethodGet, "/", nil)
+	login.SetBasicAuth("test-user", "test-password")
+	loggedIn := httptest.NewRecorder()
+	handler.ServeHTTP(loggedIn, login)
+	if loggedIn.Code != http.StatusNoContent {
+		t.Fatalf("authenticated response = %d", loggedIn.Code)
+	}
+
+	cookie := loggedIn.Result().Cookies()[0]
+	returning := httptest.NewRequest(http.MethodGet, "/", nil)
+	returning.AddCookie(cookie)
+	returned := httptest.NewRecorder()
+	handler.ServeHTTP(returned, returning)
+	if returned.Code != http.StatusNoContent {
+		t.Fatalf("session response = %d", returned.Code)
+	}
+}
 
 func TestValidateNickname(t *testing.T) {
 	if got, err := validateNickname("  Alex "); err != nil || got != "Alex" {

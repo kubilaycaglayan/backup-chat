@@ -6,10 +6,11 @@ A small two-person chat application using Go, WebSockets, and a local JSONL file
 
 ```bash
 go build -o backup-chat
+cp .env.example .env
 ./backup-chat
 ```
 
-Configuration defaults to `PORT=50000`, `DATA_FILE=./data/messages.jsonl`, and `RETENTION_DAYS=30`. For local development, open `http://localhost:50000` in a browser.
+Configuration defaults to `PORT=50000`, `DATA_FILE=./data/messages.jsonl`, and `RETENTION_DAYS=30`. The application loads an optional `.env` file from its working directory; explicitly exported environment variables take precedence. Authentication is required. For local development, open `http://localhost:50000` in a browser.
 
 ## Environment variables
 
@@ -19,6 +20,8 @@ Available configuration and deployment variable names:
 PORT
 DATA_FILE
 RETENTION_DAYS
+AUTH_USERNAME
+AUTH_PASSWORD
 TLS_CERT_FILE
 TLS_KEY_FILE
 VAPID_PUBLIC_KEY
@@ -28,11 +31,19 @@ CHAT_HOSTNAME
 CLOUDFLARE_TUNNEL_TOKEN
 ```
 
+`AUTH_USERNAME` and `AUTH_PASSWORD` are required and can be provided in `.env`
+or through the environment. After the browser completes the Basic Auth prompt,
+the application sets a signed, HttpOnly session cookie valid for 30
+days, so the user remains logged in across reloads and application restarts.
+Keep the password out of this repository.
+
 ## Development environment
 
 Use the separate development Compose file before deploying a change. It runs
 locally on port 50001, does not start Cloudflare Tunnel, and stores its messages
 in a separate `backup-chat-dev-data` Docker volume.
+
+Create a local `.env` first, then run:
 
 ```bash
 docker compose -f compose.dev.yaml up
@@ -67,6 +78,10 @@ sudo cp backup-chat.service /etc/systemd/system/backup-chat.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now backup-chat
 ```
+
+Before starting the service, create `/opt/backup-chat/.env` with
+`AUTH_USERNAME=REPLACE_ME` and `AUTH_PASSWORD=REPLACE_ME`. Keep this file
+private; it is loaded by the included unit and is not part of the repository.
 
 Inspect application logs with:
 

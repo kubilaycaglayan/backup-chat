@@ -11,6 +11,8 @@ services:
       - .:/src
       - backup-chat-dev-data:/data
     environment:
+      AUTH_USERNAME:
+      AUTH_PASSWORD:
       DATA_FILE: /data/messages.jsonl
       RETENTION_DAYS: 30
 

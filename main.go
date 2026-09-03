@@ -35,7 +35,7 @@ const (
 	websocketPingEvery = 20 * time.Second
 )
 
-//go:embed web/index.html web/app.js web/style.css web/manifest.webmanifest web/service-worker.js web/version.json web/icon.svg
+//go:embed web/index.html web/login.html web/app.js web/style.css web/manifest.webmanifest web/service-worker.js web/version.json web/icon.svg
 var webFiles embed.FS
 
 type Message struct {
@@ -382,6 +382,13 @@ func retentionFromEnv() time.Duration {
 }
 
 func main() {
+	if err := loadDotEnv(".env"); err != nil {
+		log.Fatalf("loading .env: %v", err)
+	}
+	auth, err := newAuthConfig()
+	if err != nil {
+		log.Fatalf("preparing authentication: %v", err)
+	}
 	store := &messageStore{path: envOrDefault("DATA_FILE", defaultDataFile), retention: retentionFromEnv()}
 	if err := store.prepare(); err != nil {
 		log.Fatalf("preparing message store: %v", err)
@@ -393,13 +400,14 @@ func main() {
 
 	hub := newChatHub()
 	mux := http.NewServeMux()
+	mux.HandleFunc("/login", auth.loginHandler)
 	mux.HandleFunc("/ws", websocketHandler(store, hub, push))
 	mux.HandleFunc("/push/config", pushConfigHandler(push))
 	mux.HandleFunc("/push/subscribe", pushSubscribeHandler(push))
 	mux.Handle("/", staticHandler())
 	server := &http.Server{
 		Addr:              ":" + envOrDefault("PORT", defaultPort),
-		Handler:           limitRequestBody(mux),
+		Handler:           limitRequestBody(auth.middleware(mux)),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,

@@ -1,4 +1,5 @@
 /backup-chat
+.env
 /data/messages.jsonl
 /data/messages.jsonl.vapid.json
 /data/messages.jsonl.subscriptions.json

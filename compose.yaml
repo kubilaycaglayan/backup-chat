@@ -7,6 +7,8 @@ services:
     volumes:
       - backup-chat-data:/data
     environment:
+      AUTH_USERNAME:
+      AUTH_PASSWORD:
       VAPID_PUBLIC_KEY:
       VAPID_PRIVATE_KEY:
       VAPID_SUBJECT:
